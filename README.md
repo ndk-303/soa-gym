@@ -1,6 +1,6 @@
-# Gym Management System — FastAPI Modular Monolith
+# Gym Management System — FastAPI Modular Monolith (SQLite + SQLModel)
 
-Dự án Hệ Thống Quản Lý Phòng Tập (Gym Management System) được tổ chức theo kiến trúc **Modular Monolith** bằng **FastAPI** và **Pydantic V2**. Toàn bộ 9 domain modules được tích hợp vào một ứng dụng duy nhất chạy trên cổng `8000`.
+Dự án Hệ Thống Quản Lý Phòng Tập (Gym Management System) được tổ chức theo kiến trúc **Modular Monolith** bằng **FastAPI**, **SQLModel** (kết hợp SQLAlchemy 2.0 Core và Pydantic V2) và lưu trữ dữ liệu bền vững bằng **SQLite**. Toàn bộ 9 domain modules được tích hợp vào một ứng dụng duy nhất chạy trên cổng `8000`.
 
 ---
 
@@ -8,7 +8,13 @@ Dự án Hệ Thống Quản Lý Phòng Tập (Gym Management System) được t
 
 ### Cài Đặt Môi Trường
 ```bash
-pip install fastapi uvicorn pydantic pytest httpx
+pip install fastapi uvicorn pydantic sqlmodel pytest httpx
+```
+
+### Nạp Dữ Liệu Mẫu (Tùy Chọn)
+Khởi tạo cấu trúc bảng và nạp sẵn dữ liệu mẫu vào file `gym.db`:
+```bash
+python seed.py
 ```
 
 ### Khởi Động Ứng Dụng
@@ -25,6 +31,7 @@ uvicorn app.main:app --reload --port 8000
 - **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
 ### Chạy Kiểm Thử Tự Động
+Toàn bộ test suite chạy trên SQLite in-memory (`sqlite:///:memory:`), không ảnh hưởng tới file `gym.db`:
 ```bash
 pytest tests/ -v
 ```
@@ -36,7 +43,7 @@ pytest tests/ -v
 ```
 gym-models/
 ├── app/
-│   ├── models/            # Pure Python Entity Classes (Domain Entities)
+│   ├── models/            # SQLModel Table Entities (table=True, PK, FK)
 │   │   ├── user.py
 │   │   ├── membership_plan.py
 │   │   ├── member.py
@@ -46,7 +53,7 @@ gym-models/
 │   │   ├── invoice.py
 │   │   ├── payment.py
 │   │   └── attendance.py
-│   ├── schemas/           # Pydantic V2 Request & Validation Schemas
+│   ├── schemas/           # Pydantic V2 Request DTOs & Validation Schemas
 │   │   ├── user.py
 │   │   ├── membership_plan.py
 │   │   ├── member.py
@@ -56,9 +63,10 @@ gym-models/
 │   │   ├── invoice.py
 │   │   ├── payment.py
 │   │   └── attendance.py
-│   ├── database/          # Centralized In-Memory Datastore & Seed Data
-│   │   └── db.py
-│   ├── routers/           # FastAPI APIRouters (CRUD & Domain Logic)
+│   ├── database/          # SQLite Connection Engine, Session & Seeder
+│   │   ├── session.py     # engine, get_session, create_db_and_tables
+│   │   └── seed.py        # Dữ liệu mẫu & hàm seed_database
+│   ├── routers/           # FastAPI APIRouters (CRUD & Domain Logic với SQLModel)
 │   │   ├── users.py
 │   │   ├── membership_plans.py
 │   │   ├── members.py
@@ -68,8 +76,9 @@ gym-models/
 │   │   ├── invoices.py
 │   │   ├── payments.py
 │   │   └── attendance.py
-│   └── main.py            # FastAPI Application Assembly
+│   └── main.py            # FastAPI Application Assembly & Lifespan DB init
 ├── tests/                 # Automated Unit & E2E Integration Test Suites
+│   ├── conftest.py        # In-memory SQLite fixtures & session override
 │   ├── test_models.py
 │   ├── test_schemas.py
 │   ├── test_database.py
@@ -77,6 +86,7 @@ gym-models/
 │   ├── test_main_app.py
 │   └── test_monolith_api.py
 ├── run.py                 # Application Launcher Script
+├── seed.py                # Standalone CLI Database Seeder
 ├── pytest.ini             # Test Configuration
 └── README.md
 ```
@@ -99,8 +109,9 @@ gym-models/
 
 ---
 
-## ⚡ Nghiệp Vụ Tích Hợp In-Memory
+## ⚡ Nghiệp Vụ Tích Hợp với SQLModel & SQLite
 
-1. **Member Validation:** Khi tạo Member (`POST /members/create_member`), router kiểm tra trực tiếp sự tồn tại của `user_id` và `membership_plan_id` trong database chung, trả về 400 nếu không hợp lệ.
-2. **Booking & Slot Capacity:** Khi tạo Booking (`POST /bookings/create_booking`), router kiểm tra Member có đang active và Class Slot có hợp lệ hay không. Nếu slot còn chỗ (`current_bookings < max_capacity`), xác nhận booking (`confirmed`) và tăng `current_bookings`. Nếu slot đã đầy, tự động chuyển sang `waitlisted` kèm vị trí hàng đợi.
-3. **Payment & Invoice Settlement:** Khi tạo Payment (`POST /payments/create_payment`), router kiểm tra Invoice tồn tại và chưa thanh toán. Sau khi ghi nhận payment, cập nhật `amount_paid` và chuyển trạng thái Invoice sang `paid`.
+1. **Session Lifecycle:** Mọi router endpoint đều inject `session: Session = Depends(get_session)` với cơ chế quản lý giao dịch an toàn.
+2. **Member Validation:** Khi tạo Member (`POST /members/create_member`), router kiểm tra sự tồn tại của `user_id` và `membership_plan_id` trong SQLite qua `session.get()`, trả về 400 nếu không hợp lệ.
+3. **Booking & Slot Capacity:** Khi tạo Booking (`POST /bookings/create_booking`), router kiểm tra Member có đang active và Class Slot có bị hủy (`is_cancelled`) hay không. Nếu slot còn chỗ (`current_bookings < max_capacity`), xác nhận booking (`confirmed`) và tăng `current_bookings`. Nếu slot đã đầy, tự động chuyển sang `waitlisted` kèm vị trí hàng đợi dựa trên số lượng booking đang chờ trong cơ sở dữ liệu.
+4. **Payment & Invoice Settlement:** Khi tạo Payment (`POST /payments/create_payment`), router kiểm tra Invoice tồn tại và chưa thanh toán đầy đủ. Sau khi ghi nhận payment, cập nhật `amount_paid` và tự động chuyển trạng thái Invoice sang `paid` khi hoàn tất.

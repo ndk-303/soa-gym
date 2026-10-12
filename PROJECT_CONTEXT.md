@@ -1,8 +1,8 @@
 # Gym Management System — Project Architecture & Context
 
 ## 1. Project Overview
-A modular monolith gym management system built with **FastAPI** and **Pydantic V2**. 
-Originally designed as individual microservices, the system has been refactored into a clean, layered **Modular Monolith** running within a single FastAPI process on port `8000`.
+A modular monolith gym management system built with **FastAPI**, **SQLModel** (SQLAlchemy 2.0 Core + Pydantic V2), and persistent storage in **SQLite** (`./gym.db`).
+The system consolidates 9 business domains into a single high-performance application running on port `8000`.
 
 ---
 
@@ -10,11 +10,16 @@ Originally designed as individual microservices, the system has been refactored 
 
 The system follows a strict layered pattern across 9 business domains:
 
-1. **`app/models/` (Domain Entities)**: Pure Python classes representing core entities with standard constructors (`__init__`).
-2. **`app/schemas/` (Validation & DTOs)**: Pydantic V2 models with strict boundary validations (`gt`, `lt`, `min_length`, `max_length`), and `model_config = ConfigDict(json_schema_extra={...})` for OpenAPI documentation.
-3. **`app/database/` (Centralized In-Memory Store)**: `db.py` contains in-memory stores initialized with seed records, thread-safe counter ID generators, and `reset_database()` utility for test isolation.
-4. **`app/routers/` (FastAPI APIRouters)**: 9 REST APIRouters with standard CRUD operations, 404 guards, and direct memory business workflow integrations.
-5. **`app/main.py` & `run.py`**: Central application setup with registered routers and standalone startup script.
+1. **`app/models/` (SQLModel Table Entities)**: Classes inheriting from `SQLModel, table=True` with typed fields, primary keys (`Field(default=None, primary_key=True)`), and foreign key relations (`Field(foreign_key="...")`).
+2. **`app/schemas/` (Validation & DTOs)**: Pure Pydantic V2 request models (`*Request`) with strict boundary validations (`gt`, `lt`, `min_length`, `max_length`), and `model_config = ConfigDict(json_schema_extra={...})` for OpenAPI documentation.
+3. **`app/database/` (SQLite Session & Seeder)**:
+   - `session.py`: Creates `engine` pointing to `sqlite:///gym.db` (configurable via `DATABASE_URL`), provides `create_db_and_tables()` and `get_session()` FastAPI generator dependency.
+   - `seed.py`: Contains idempotent `seed_database(session)` function with standard mock dataset.
+4. **`app/routers/` (FastAPI APIRouters)**: 9 REST APIRouters injecting `session: Session = Depends(get_session)` executing type-safe SQLModel queries (`select`, `session.get`, `session.add`, `session.commit`, `session.delete`).
+5. **`app/main.py` & `run.py` & `seed.py`**:
+   - `app/main.py`: Central application setup registering all 9 routers with tags and prefixes, plus a FastAPI `lifespan` handler executing `create_db_and_tables()`.
+   - `run.py`: Lightweight application launcher.
+   - `seed.py`: Standalone CLI script for database initialization and seeding.
 
 ---
 
@@ -103,27 +108,30 @@ erDiagram
 ## 4. Domain Workflows
 
 1. **Member Onboarding (`/members`)**:
-   - Validates existence of referenced `user_id` and `membership_plan_id` directly in memory.
-   - Prevents orphan member profiles.
+   - Validates existence of referenced `user_id` and optional `membership_plan_id` via `session.get()`.
+   - Prevents orphan member profiles (returns 400 Bad Request on invalid keys).
 
 2. **Class Scheduling & Waitlists (`/bookings`)**:
    - Ensures member status is `active`.
-   - Checks slot cancellation status and capacity.
+   - Checks slot cancellation status (`is_cancelled`) and capacity.
    - If slot is open (`current_bookings < max_capacity`), increments slot count and marks booking as `confirmed`.
-   - If slot is full, marks booking as `waitlisted` with sequential queue position without altering capacity.
+   - If slot is full, queries existing waitlisted entries and marks booking as `waitlisted` with sequential queue position without altering capacity.
 
 3. **Billing Settlement (`/payments`)**:
    - Validates invoice existence and verifies that invoice is not already `paid`.
-   - Creates payment record and marks invoice as settled (`status="paid"`, `amount_paid=invoice.amount`).
+   - Creates payment record, increments `invoice.amount_paid`, and transitions `invoice.status` to `"paid"` upon full settlement.
 
 ---
 
 ## 5. Development & Testing Commands
 
 ```bash
+# Seed initial sample data to gym.db
+python seed.py
+
 # Run application
 python run.py
 
-# Run test suites
+# Run isolated in-memory test suites
 pytest tests/ -v
 ```

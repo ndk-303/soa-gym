@@ -27,6 +27,7 @@ def get_attendance_by_id(attendance_id: int = Path(gt=0), session: Session = Dep
 
 
 @router.post("/create_attendance", response_model=AttendanceRecord)
+@router.post("/create_record", response_model=AttendanceRecord)
 def create_attendance(req: AttendanceRecordRequest, session: Session = Depends(get_session)):
     new_record = AttendanceRecord.model_validate(req)
     session.add(new_record)
