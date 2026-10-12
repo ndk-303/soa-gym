@@ -1,4 +1,6 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from app.database.session import create_db_and_tables
 
 from app.routers.users import router as users_router
 from app.routers.membership_plans import router as plans_router
@@ -10,10 +12,18 @@ from app.routers.invoices import router as invoices_router
 from app.routers.payments import router as payments_router
 from app.routers.attendance import router as attendance_router
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_db_and_tables()
+    yield
+
+
 app = FastAPI(
     title="Gym Management System API",
     version="2.0.0",
-    description="Unified Modular Monolith API for Gym Management",
+    description="Unified Modular Monolith API for Gym Management with SQLite & SQLModel",
+    lifespan=lifespan,
 )
 
 
