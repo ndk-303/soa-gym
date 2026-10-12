@@ -1,11 +1,9 @@
-class User:
-    id: int
-    email: str
+from typing import Optional
+from sqlmodel import Field, SQLModel
+
+
+class User(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(index=True, unique=True)
     role: str
     password: str
-
-    def __init__(self, id: int, email: str, role: str, password: str):
-        self.id = id
-        self.email = email
-        self.role = role
-        self.password = password

@@ -1,16 +1,10 @@
 from typing import Optional
+from sqlmodel import Field, SQLModel
 
 
-class Payment:
-    id: int
-    invoice_id: int
+class Payment(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    invoice_id: int = Field(foreign_key="invoice.id")
     amount: float
-    payment_method: str
-    notes: Optional[str]
-
-    def __init__(self, id: int, invoice_id: int, amount: float, payment_method: str = "cash", notes: Optional[str] = ""):
-        self.id = id
-        self.invoice_id = invoice_id
-        self.amount = amount
-        self.payment_method = payment_method
-        self.notes = notes
+    payment_method: str = Field(default="cash")
+    notes: Optional[str] = Field(default=None)

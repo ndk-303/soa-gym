@@ -1,13 +1,10 @@
-class MembershipPlan:
-    id: int
+from typing import Optional
+from sqlmodel import Field, SQLModel
+
+
+class MembershipPlan(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     duration_days: int
     price: float
-    is_active: bool
-
-    def __init__(self, id: int, name: str, duration_days: int, price: float, is_active: bool = True):
-        self.id = id
-        self.name = name
-        self.duration_days = duration_days
-        self.price = price
-        self.is_active = is_active
+    is_active: bool = Field(default=True)

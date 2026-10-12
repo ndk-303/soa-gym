@@ -1,16 +1,10 @@
 from typing import Optional
+from sqlmodel import Field, SQLModel
 
 
-class Booking:
-    id: int
-    member_id: int
-    slot_id: int
-    status: str
-    waitlist_position: Optional[int]
-
-    def __init__(self, id: int, member_id: int, slot_id: int, status: str = "confirmed", waitlist_position: Optional[int] = None):
-        self.id = id
-        self.member_id = member_id
-        self.slot_id = slot_id
-        self.status = status
-        self.waitlist_position = waitlist_position
+class Booking(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    member_id: int = Field(foreign_key="member.id")
+    slot_id: int = Field(foreign_key="classslot.id")
+    status: str = Field(default="confirmed")
+    waitlist_position: Optional[int] = Field(default=None)

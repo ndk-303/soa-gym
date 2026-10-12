@@ -1,13 +1,10 @@
-class Invoice:
-    id: int
-    member_id: int
-    amount: float
-    amount_paid: float
-    status: str
+from typing import Optional
+from sqlmodel import Field, SQLModel
 
-    def __init__(self, id: int, member_id: int, amount: float, amount_paid: float = 0.0, status: str = "pending"):
-        self.id = id
-        self.member_id = member_id
-        self.amount = amount
-        self.amount_paid = amount_paid
-        self.status = status
+
+class Invoice(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    member_id: int = Field(foreign_key="member.id")
+    amount: float
+    amount_paid: float = Field(default=0.0)
+    status: str = Field(default="pending")

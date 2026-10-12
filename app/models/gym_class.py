@@ -1,13 +1,10 @@
-class GymClass:
-    id: int
+from typing import Optional
+from sqlmodel import Field, SQLModel
+
+
+class GymClass(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     category: str
-    trainer_id: int
-    is_active: bool
-
-    def __init__(self, id: int, name: str, category: str, trainer_id: int, is_active: bool = True):
-        self.id = id
-        self.name = name
-        self.category = category
-        self.trainer_id = trainer_id
-        self.is_active = is_active
+    trainer_id: int = Field(foreign_key="user.id")
+    is_active: bool = Field(default=True)
