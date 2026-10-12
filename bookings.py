@@ -1,9 +1,47 @@
-from typing import Optional
+from typing import Optional, Dict, Any
 
-from fastapi import FastAPI, Body
+import httpx
+from fastapi import FastAPI, Body, HTTPException
 from pydantic import BaseModel, Field
 
 app = FastAPI()
+
+MEMBER_SERVICE_URL = "http://127.0.0.1:8003"
+SLOT_SERVICE_URL = "http://127.0.0.1:8005"
+
+
+async def fetch_member(member_id: int) -> Dict[str, Any]:
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            res = await client.get(f"{MEMBER_SERVICE_URL}/members/{member_id}")
+            if res.status_code == 404:
+                raise HTTPException(status_code=404, detail=f"Member {member_id} not found")
+            res.raise_for_status()
+            return res.json()
+    except httpx.RequestError:
+        raise HTTPException(status_code=503, detail="Member service is unavailable")
+
+
+async def fetch_slot(slot_id: int) -> Dict[str, Any]:
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            res = await client.get(f"{SLOT_SERVICE_URL}/class_slots/{slot_id}")
+            if res.status_code == 404:
+                raise HTTPException(status_code=404, detail=f"Class slot {slot_id} not found")
+            res.raise_for_status()
+            return res.json()
+    except httpx.RequestError:
+        raise HTTPException(status_code=503, detail="Class slot service is unavailable")
+
+
+async def increment_slot_booking(slot_id: int) -> Dict[str, Any]:
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            res = await client.post(f"{SLOT_SERVICE_URL}/class_slots/{slot_id}/increment_booking")
+            res.raise_for_status()
+            return res.json()
+    except httpx.RequestError:
+        raise HTTPException(status_code=503, detail="Class slot service is unavailable")
 
 
 class Booking:
@@ -71,12 +109,39 @@ async def get_booking(id: int):
     for booking in BOOKINGS:
         if booking.id == id:
             return booking
+    raise HTTPException(status_code=404, detail="Booking not found")
 
 
 @app.post("/booking/create_booking")
 async def create_booking(request_booking: BookingRequest):
-    new_booking = Booking(**request_booking.dict())
-    BOOKINGS.append(find_booking_id(new_booking))
+    member = await fetch_member(request_booking.member_id)
+    if member.get("status", "").casefold() != "active":
+        raise HTTPException(status_code=400, detail="Member is not active")
+
+    slot = await fetch_slot(request_booking.slot_id)
+    if slot.get("is_cancelled"):
+        raise HTTPException(status_code=400, detail="Class slot has been cancelled")
+
+    max_capacity = slot.get("max_capacity", 20)
+    current_bookings = slot.get("current_bookings", 0)
+
+    if current_bookings < max_capacity:
+        status = "confirmed"
+        waitlist_position = None
+        await increment_slot_booking(request_booking.slot_id)
+    else:
+        status = "waitlisted"
+        existing_waitlists = sum(1 for b in BOOKINGS if b.slot_id == request_booking.slot_id and b.status == "waitlisted")
+        waitlist_position = existing_waitlists + 1
+
+    booking_data = request_booking.dict()
+    booking_data["status"] = status
+    booking_data["waitlist_position"] = waitlist_position
+
+    new_booking = Booking(**booking_data)
+    new_booking = find_booking_id(new_booking)
+    BOOKINGS.append(new_booking)
+    return new_booking
 
 
 def find_booking_id(booking: Booking):
