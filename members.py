@@ -1,9 +1,31 @@
 from typing import Optional
 
-from fastapi import FastAPI, Body
+import httpx
+from fastapi import FastAPI, Body, HTTPException
 from pydantic import BaseModel, Field
 
 app = FastAPI()
+
+USER_SERVICE_URL = "http://127.0.0.1:8001"
+PLAN_SERVICE_URL = "http://127.0.0.1:8002"
+
+
+async def check_user_exists(user_id: int) -> bool:
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            res = await client.get(f"{USER_SERVICE_URL}/users/{user_id}")
+            return res.status_code == 200
+    except httpx.RequestError:
+        raise HTTPException(status_code=503, detail="User service is unavailable")
+
+
+async def check_plan_exists(plan_id: int) -> bool:
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            res = await client.get(f"{PLAN_SERVICE_URL}/membership_plans/{plan_id}")
+            return res.status_code == 200
+    except httpx.RequestError:
+        raise HTTPException(status_code=503, detail="Membership plan service is unavailable")
 
 
 class Member:
@@ -70,12 +92,24 @@ async def get_member(id: int):
     for member in MEMBERS:
         if member.id == id:
             return member
+    raise HTTPException(status_code=404, detail="Member not found")
 
 
 @app.post("/member/create_member")
 async def create_member(request_member: MemberRequest):
+    user_ok = await check_user_exists(request_member.user_id)
+    if not user_ok:
+        raise HTTPException(status_code=400, detail=f"User with id {request_member.user_id} does not exist")
+
+    if request_member.membership_plan_id is not None:
+        plan_ok = await check_plan_exists(request_member.membership_plan_id)
+        if not plan_ok:
+            raise HTTPException(status_code=400, detail=f"Membership plan {request_member.membership_plan_id} does not exist")
+
     new_member = Member(**request_member.dict())
-    MEMBERS.append(find_member_id(new_member))
+    new_member = find_member_id(new_member)
+    MEMBERS.append(new_member)
+    return new_member
 
 
 def find_member_id(member: Member):
