@@ -1,39 +1,106 @@
-# Gym Models — FastAPI Simple CRUD Pattern
+# Gym Management System — FastAPI Modular Monolith
 
-Thư mục này chứa các file định nghĩa Model và API CRUD theo phong cách tinh gọn của `books.py`.
-Mỗi file là một ứng dụng FastAPI độc lập, lưu trữ dữ liệu in-memory mẫu, có Pydantic validation (`Field` limits: `min_length`, `max_length`, `gt`, `lt`) và `Config.json_schema_extra` example.
+Dự án Hệ Thống Quản Lý Phòng Tập (Gym Management System) được tổ chức theo kiến trúc **Modular Monolith** bằng **FastAPI** và **Pydantic V2**. Toàn bộ 9 domain modules được tích hợp vào một ứng dụng duy nhất chạy trên cổng `8000`.
 
 ---
 
-## Danh Sách Các File Models
+## 🚀 Khởi Chạy Nhanh
 
-| File | Model | Mô Tả | Lệnh Khởi Chạy (Chạy độc lập) |
+### Cài Đặt Môi Trường
+```bash
+pip install fastapi uvicorn pydantic pytest httpx
+```
+
+### Khởi Động Ứng Dụng
+```bash
+python run.py
+```
+Hoặc dùng uvicorn trực tiếp:
+```bash
+uvicorn app.main:app --reload --port 8000
+```
+
+- **Root API / Health:** [http://localhost:8000/](http://localhost:8000/)
+- **Swagger UI Interactive Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
+
+### Chạy Kiểm Thử Tự Động
+```bash
+pytest tests/ -v
+```
+
+---
+
+## 🏗️ Cấu Trúc Thư Mục Dự Án
+
+```
+gym-models/
+├── app/
+│   ├── models/            # Pure Python Entity Classes (Domain Entities)
+│   │   ├── user.py
+│   │   ├── membership_plan.py
+│   │   ├── member.py
+│   │   ├── gym_class.py
+│   │   ├── class_slot.py
+│   │   ├── booking.py
+│   │   ├── invoice.py
+│   │   ├── payment.py
+│   │   └── attendance.py
+│   ├── schemas/           # Pydantic V2 Request & Validation Schemas
+│   │   ├── user.py
+│   │   ├── membership_plan.py
+│   │   ├── member.py
+│   │   ├── gym_class.py
+│   │   ├── class_slot.py
+│   │   ├── booking.py
+│   │   ├── invoice.py
+│   │   ├── payment.py
+│   │   └── attendance.py
+│   ├── database/          # Centralized In-Memory Datastore & Seed Data
+│   │   └── db.py
+│   ├── routers/           # FastAPI APIRouters (CRUD & Domain Logic)
+│   │   ├── users.py
+│   │   ├── membership_plan.py
+│   │   ├── members.py
+│   │   ├── gym_classes.py
+│   │   ├── class_slots.py
+│   │   ├── bookings.py
+│   │   ├── invoices.py
+│   │   ├── payments.py
+│   │   └── attendance.py
+│   └── main.py            # FastAPI Application Assembly
+├── tests/                 # Automated Unit & E2E Integration Test Suites
+│   ├── test_models.py
+│   ├── test_schemas.py
+│   ├── test_database.py
+│   ├── test_routers_logic.py
+│   ├── test_main_app.py
+│   └── test_monolith_api.py
+├── run.py                 # Application Launcher Script
+├── pytest.ini             # Test Configuration
+└── README.md
+```
+
+---
+
+## 📦 Danh Sách Domain Modules & API Routes
+
+| Module | Route Prefix | Tags | Chức Năng Chính |
 |---|---|---|---|
-| `users.py` | `User` | Quản lý người dùng (Admin, Trainer, Member) | `uvicorn users:app --reload --port 8001` |
-| `membership_plans.py` | `MembershipPlan` | Quản lý các gói tập (1 tháng, 3 tháng, 1 năm...) | `uvicorn membership_plans:app --reload --port 8002` |
-| `members.py` | `Member` | Quản lý hồ sơ hội viên và liên kết gói | `uvicorn members:app --reload --port 8003` |
-| `gym_classes.py` | `GymClass` | Quản lý các lớp học (Yoga, Boxing, HIIT...) | `uvicorn gym_classes:app --reload --port 8004` |
-| `class_slots.py` | `ClassSlot` | Quản lý khung giờ tập (Slot) của lớp học | `uvicorn class_slots:app --reload --port 8005` |
-| `bookings.py` | `Booking` | Quản lý đặt chỗ lớp học và hàng đợi (Waitlist) | `uvicorn bookings:app --reload --port 8006` |
-| `invoices.py` | `Invoice` | Quản lý hóa đơn tiền gói tập | `uvicorn invoices:app --reload --port 8007` |
-| `payments.py` | `Payment` | Quản lý thanh toán hóa đơn | `uvicorn payments:app --reload --port 8008` |
-| `attendance.py` | `AttendanceRecord` | Quản lý lượt ra vào điểm danh (Check-in/Check-out) | `uvicorn attendance:app --reload --port 8009` |
+| `users` | `/users` | `Users` | Quản lý tài khoản (Admin, Trainer, Member) |
+| `membership_plans` | `/membership_plans` | `Membership Plans` | Quản lý gói tập (giá, thời hạn ngày) |
+| `members` | `/members` | `Members` | Quản lý hội viên (kiểm tra `user_id` và `plan_id`) |
+| `gym_classes` | `/gym_classes` | `Gym Classes` | Quản lý lớp tập (Yoga, Boxing, HIIT...) |
+| `class_slots` | `/class_slots` | `Class Slots` | Khung giờ tập và giới hạn sức chứa (capacity) |
+| `bookings` | `/bookings` | `Bookings` | Đặt chỗ lớp học & tự động đưa vào Waitlist khi đầy |
+| `invoices` | `/invoices` | `Invoices` | Hóa đơn thanh toán gói tập |
+| `payments` | `/payments` | `Payments` | Thanh toán và tự động cập nhật trạng thái hóa đơn |
+| `attendance` | `/attendance` | `Attendance` | Điểm danh ra/vào phòng tập |
 
 ---
 
-## Cấu Trúc Mỗi File Chuẩn Theo `books.py`
+## ⚡ Nghiệp Vụ Tích Hợp In-Memory
 
-1. **Python Class**: Khởi tạo object với phương thức `__init__`.
-2. **Pydantic Request Model (`BaseModel`)**:
-   - `id: Optional[int] = Field(title="id is not needed")`
-   - Các trường dữ liệu đi kèm giới hạn: `min_length`, `max_length`, `gt`, `lt`, `ge`.
-   - `class Config`: Cung cấp `json_schema_extra` làm mẫu dữ liệu example trong Swagger Docs `/docs`.
-3. **Danh sách in-memory**: Mảng Python chứa sẵn 3-4 bản ghi mẫu.
-4. **Các API Endpoints**:
-   - `GET /`: Trang chủ
-   - `GET /<entities>`: Lấy toàn bộ danh sách
-   - `GET /<entities>/get_...`: Lọc dữ liệu theo điều kiện (query param)
-   - `GET /<entities>/{id}`: Lấy chi tiết 1 đối tượng theo ID
-   - `POST /<entity>/create_<entity>`: Thêm mới đối tượng, tự động tăng ID qua hàm `find_<entity>_id`
-   - `PUT /<entity>/update_<entity>`: Cập nhật thông tin đối tượng
-   - `DELETE /<entities>/delete_<entity>/{id}`: Xóa đối tượng theo ID
+1. **Member Validation:** Khi tạo Member (`POST /members/create_member`), router kiểm tra trực tiếp sự tồn tại của `user_id` và `membership_plan_id` trong database chung, trả về 400 nếu không hợp lệ.
+2. **Booking & Slot Capacity:** Khi tạo Booking (`POST /bookings/create_booking`), router kiểm tra Member có đang active và Class Slot có hợp lệ hay không. Nếu slot còn chỗ (`current_bookings < max_capacity`), xác nhận booking (`confirmed`) và tăng `current_bookings`. Nếu slot đã đầy, tự động chuyển sang `waitlisted` kèm vị trí hàng đợi.
+3. **Payment & Invoice Settlement:** Khi tạo Payment (`POST /payments/create_payment`), router kiểm tra Invoice tồn tại và chưa thanh toán. Sau khi ghi nhận payment, cập nhật `amount_paid` và chuyển trạng thái Invoice sang `paid`.
