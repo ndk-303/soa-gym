@@ -14,8 +14,14 @@ async def check_user_exists(user_id: int) -> bool:
     try:
         async with httpx.AsyncClient(timeout=2.0) as client:
             res = await client.get(f"{USER_SERVICE_URL}/users/{user_id}")
-            return res.status_code == 200
-    except httpx.RequestError:
+            if res.status_code == 200:
+                return True
+            if res.status_code == 404:
+                return False
+            raise HTTPException(status_code=503, detail="User service error")
+    except HTTPException:
+        raise
+    except httpx.HTTPError:
         raise HTTPException(status_code=503, detail="User service is unavailable")
 
 
@@ -23,8 +29,14 @@ async def check_plan_exists(plan_id: int) -> bool:
     try:
         async with httpx.AsyncClient(timeout=2.0) as client:
             res = await client.get(f"{PLAN_SERVICE_URL}/membership_plans/{plan_id}")
-            return res.status_code == 200
-    except httpx.RequestError:
+            if res.status_code == 200:
+                return True
+            if res.status_code == 404:
+                return False
+            raise HTTPException(status_code=503, detail="Membership plan service error")
+    except HTTPException:
+        raise
+    except httpx.HTTPError:
         raise HTTPException(status_code=503, detail="Membership plan service is unavailable")
 
 

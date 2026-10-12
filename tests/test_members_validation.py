@@ -53,3 +53,17 @@ async def test_create_member_success_with_valid_relations():
             })
             assert res.status_code == 200
             assert res.json()["email"] == "valid_success@gym.com"
+
+
+@pytest.mark.asyncio
+async def test_create_member_503_on_downstream_outage():
+    import httpx
+    async with AsyncClient(transport=ASGITransport(app=members_app), base_url="http://test") as client:
+        with patch("httpx.AsyncClient.get", side_effect=httpx.ConnectError("Connection refused")):
+            res = await client.post("/member/create_member", json={
+                "user_id": 1,
+                "email": "outage@gym.com",
+                "status": "active"
+            })
+            assert res.status_code == 503
+            assert "unavailable" in res.json()["detail"].lower()

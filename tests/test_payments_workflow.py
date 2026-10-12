@@ -53,3 +53,33 @@ async def test_payment_calls_apply_payment():
             assert res.status_code == 200
             assert res.json()["amount"] == 1350000.0
             mock_apply.assert_awaited_once_with(2, 1350000.0)
+
+
+@pytest.mark.asyncio
+async def test_payment_503_on_downstream_outage():
+    import httpx
+    async with AsyncClient(transport=ASGITransport(app=payments_app), base_url="http://test") as client:
+        with patch("httpx.AsyncClient.get", side_effect=httpx.ConnectError("Connection refused")):
+            res = await client.post("/payment/create_payment", json={
+                "invoice_id": 2,
+                "amount": 100000.0,
+                "payment_method": "cash"
+            })
+            assert res.status_code == 503
+            assert "unavailable" in res.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_payment_does_not_mutate_state_if_apply_fails():
+    from payments import PAYMENTS
+    count_before = len(PAYMENTS)
+    async with AsyncClient(transport=ASGITransport(app=payments_app), base_url="http://test") as client:
+        with patch("payments.fetch_invoice", return_value={"id": 2, "status": "pending"}), \
+             patch("payments.apply_invoice_payment", side_effect=HTTPException(status_code=503, detail="Invoice service down")):
+            res = await client.post("/payment/create_payment", json={
+                "invoice_id": 2,
+                "amount": 50000.0,
+                "payment_method": "cash"
+            })
+            assert res.status_code == 503
+            assert len(PAYMENTS) == count_before

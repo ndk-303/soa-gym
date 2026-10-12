@@ -18,7 +18,9 @@ async def fetch_member(member_id: int) -> Dict[str, Any]:
                 raise HTTPException(status_code=404, detail=f"Member {member_id} not found")
             res.raise_for_status()
             return res.json()
-    except httpx.RequestError:
+    except HTTPException:
+        raise
+    except httpx.HTTPError:
         raise HTTPException(status_code=503, detail="Member service is unavailable")
 
 
@@ -30,7 +32,9 @@ async def fetch_slot(slot_id: int) -> Dict[str, Any]:
                 raise HTTPException(status_code=404, detail=f"Class slot {slot_id} not found")
             res.raise_for_status()
             return res.json()
-    except httpx.RequestError:
+    except HTTPException:
+        raise
+    except httpx.HTTPError:
         raise HTTPException(status_code=503, detail="Class slot service is unavailable")
 
 
@@ -40,7 +44,9 @@ async def increment_slot_booking(slot_id: int) -> Dict[str, Any]:
             res = await client.post(f"{SLOT_SERVICE_URL}/class_slots/{slot_id}/increment_booking")
             res.raise_for_status()
             return res.json()
-    except httpx.RequestError:
+    except HTTPException:
+        raise
+    except httpx.HTTPError:
         raise HTTPException(status_code=503, detail="Class slot service is unavailable")
 
 

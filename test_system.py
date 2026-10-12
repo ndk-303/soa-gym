@@ -46,8 +46,24 @@ def main():
                 "warning",
             ]
             spawned_processes.append(subprocess.Popen(cmd))
-        print("[*] Waiting 3 seconds for services to initialize...")
-        time.sleep(3)
+
+        print("[*] Waiting for API Gateway and microservices to become ready...")
+        ready = False
+        start_wait = time.time()
+        while time.time() - start_wait < 15.0:
+            if is_gateway_running():
+                try:
+                    hr = httpx.get(f"{GATEWAY_URL}/health", timeout=1.0)
+                    if hr.status_code == 200 and hr.json().get("status") == "healthy":
+                        ready = True
+                        break
+                except Exception:
+                    pass
+            time.sleep(0.5)
+
+        if not ready:
+            raise RuntimeError("Timed out waiting for microservices to start.")
+        print(f"[*] All services ready after {time.time() - start_wait:.1f}s.")
     else:
         print("[*] Gateway is already running. Proceeding with tests against live system.")
 
@@ -121,6 +137,17 @@ def main():
         assert slot_after["current_bookings"] == bookings_before + 1
         print(f"    -> PASS: Booking confirmed and slot bookings increased from {bookings_before} to {slot_after['current_bookings']}.")
 
+        # Test 6b: Booking auto-waitlisting on full slot (slot_id=3: current=20, max=20)
+        print("\n[6b] Testing Booking auto-waitlisting on full slot (slot_id=3)...")
+        r_wait = httpx.post(f"{GATEWAY_URL}/api/bookings/booking/create_booking", json={
+            "member_id": new_member_id,
+            "slot_id": 3
+        }, timeout=3.0)
+        assert r_wait.status_code == 200
+        assert r_wait.json()["status"] == "waitlisted"
+        assert r_wait.json()["waitlist_position"] is not None
+        print(f"    -> PASS: Full slot booking auto-waitlisted at position {r_wait.json()['waitlist_position']}.")
+
         # Test 7: Payment Application & Invoice Settlement
         print("\n[7] Testing Payment creation & Invoice status update (POST /api/payments/payment/create_payment)...")
         # Invoice 2 initial: amount=1350000, amount_paid=0.0, status='pending'
@@ -139,6 +166,17 @@ def main():
         assert inv_after["amount_paid"] == 1350000.0
         assert inv_after["status"] == "paid"
         print(f"    -> PASS: Payment created, Invoice 2 updated to amount_paid=1,350,000 and status='paid'.")
+
+        # Test 7b: Reject payment on already-paid invoice
+        print("\n[7b] Testing rejection of payment on already-paid invoice...")
+        r_paid = httpx.post(f"{GATEWAY_URL}/api/payments/payment/create_payment", json={
+            "invoice_id": 2,
+            "amount": 1000.0,
+            "payment_method": "cash"
+        }, timeout=3.0)
+        assert r_paid.status_code == 400
+        assert "already fully paid" in r_paid.json()["detail"].lower()
+        print("    -> PASS: Payment on already-paid invoice rejected with 400 Bad Request.")
 
         print("\n==================================================")
         print("ALL 7 END-TO-END TESTS PASSED SUCCESSFULLY!")

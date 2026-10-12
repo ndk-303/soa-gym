@@ -65,3 +65,16 @@ async def test_booking_auto_waitlists_when_slot_full():
             assert res.status_code == 200
             assert res.json()["status"] == "waitlisted"
             assert res.json()["waitlist_position"] is not None
+
+
+@pytest.mark.asyncio
+async def test_booking_503_on_downstream_outage():
+    import httpx
+    async with AsyncClient(transport=ASGITransport(app=bookings_app), base_url="http://test") as client:
+        with patch("httpx.AsyncClient.get", side_effect=httpx.ConnectError("Connection refused")):
+            res = await client.post("/booking/create_booking", json={
+                "member_id": 1,
+                "slot_id": 1
+            })
+            assert res.status_code == 503
+            assert "unavailable" in res.json()["detail"].lower()

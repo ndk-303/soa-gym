@@ -17,7 +17,9 @@ async def fetch_invoice(invoice_id: int) -> Dict[str, Any]:
                 raise HTTPException(status_code=404, detail=f"Invoice {invoice_id} not found")
             res.raise_for_status()
             return res.json()
-    except httpx.RequestError:
+    except HTTPException:
+        raise
+    except httpx.HTTPError:
         raise HTTPException(status_code=503, detail="Invoice service is unavailable")
 
 
@@ -27,7 +29,9 @@ async def apply_invoice_payment(invoice_id: int, amount: float) -> Dict[str, Any
             res = await client.post(f"{INVOICE_SERVICE_URL}/invoices/{invoice_id}/apply_payment?paid_amount={amount}")
             res.raise_for_status()
             return res.json()
-    except httpx.RequestError:
+    except HTTPException:
+        raise
+    except httpx.HTTPError:
         raise HTTPException(status_code=503, detail="Invoice service is unavailable")
 
 
@@ -104,11 +108,11 @@ async def create_payment(request_payment: PaymentRequest):
     if invoice.get("status", "").casefold() == "paid":
         raise HTTPException(status_code=400, detail="Invoice is already fully paid")
 
+    await apply_invoice_payment(request_payment.invoice_id, request_payment.amount)
+
     new_payment = Payment(**request_payment.dict())
     new_payment = find_payment_id(new_payment)
     PAYMENTS.append(new_payment)
-
-    await apply_invoice_payment(request_payment.invoice_id, request_payment.amount)
     return new_payment
 
 
