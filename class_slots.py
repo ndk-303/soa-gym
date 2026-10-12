@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import FastAPI, Body
+from fastapi import FastAPI, Body, HTTPException
 from pydantic import BaseModel, Field
 
 app = FastAPI()
@@ -75,6 +75,16 @@ async def get_slot(id: int):
     for slot in CLASS_SLOTS:
         if slot.id == id:
             return slot
+    raise HTTPException(status_code=404, detail="Class slot not found")
+
+
+@app.post("/class_slots/{id}/increment_booking")
+async def increment_booking(id: int):
+    for slot in CLASS_SLOTS:
+        if slot.id == id:
+            slot.current_bookings += 1
+            return slot
+    raise HTTPException(status_code=404, detail="Class slot not found")
 
 
 @app.post("/class_slot/create_slot")

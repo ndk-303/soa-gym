@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import FastAPI, Body
+from fastapi import FastAPI, Body, HTTPException
 from pydantic import BaseModel, Field
 
 app = FastAPI()
@@ -67,6 +67,7 @@ async def get_user(id: int):
     for user in USERS:
         if user.id == id:
             return user
+    raise HTTPException(status_code=404, detail="User not found")
 
 
 @app.post("/user/create_user")

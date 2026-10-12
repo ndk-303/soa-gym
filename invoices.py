@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import FastAPI, Body
+from fastapi import FastAPI, Body, HTTPException
 from pydantic import BaseModel, Field
 
 app = FastAPI()
@@ -71,6 +71,18 @@ async def get_invoice(id: int):
     for invoice in INVOICES:
         if invoice.id == id:
             return invoice
+    raise HTTPException(status_code=404, detail="Invoice not found")
+
+
+@app.post("/invoices/{id}/apply_payment")
+async def apply_payment(id: int, paid_amount: float):
+    for invoice in INVOICES:
+        if invoice.id == id:
+            invoice.amount_paid += paid_amount
+            if invoice.amount_paid >= invoice.amount:
+                invoice.status = "paid"
+            return invoice
+    raise HTTPException(status_code=404, detail="Invoice not found")
 
 
 @app.post("/invoice/create_invoice")

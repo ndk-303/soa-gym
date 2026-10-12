@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import FastAPI, Body
+from fastapi import FastAPI, Body, HTTPException
 from pydantic import BaseModel, Field
 
 app = FastAPI()
@@ -71,6 +71,7 @@ async def get_plan(id: int):
     for plan in MEMBERSHIP_PLANS:
         if plan.id == id:
             return plan
+    raise HTTPException(status_code=404, detail="Membership plan not found")
 
 
 @app.post("/membership_plan/create_plan")
