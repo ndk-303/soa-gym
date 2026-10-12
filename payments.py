@@ -1,9 +1,34 @@
-from typing import Optional
+from typing import Optional, Dict, Any
 
-from fastapi import FastAPI, Body
+import httpx
+from fastapi import FastAPI, Body, HTTPException
 from pydantic import BaseModel, Field
 
 app = FastAPI()
+
+INVOICE_SERVICE_URL = "http://127.0.0.1:8007"
+
+
+async def fetch_invoice(invoice_id: int) -> Dict[str, Any]:
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            res = await client.get(f"{INVOICE_SERVICE_URL}/invoices/{invoice_id}")
+            if res.status_code == 404:
+                raise HTTPException(status_code=404, detail=f"Invoice {invoice_id} not found")
+            res.raise_for_status()
+            return res.json()
+    except httpx.RequestError:
+        raise HTTPException(status_code=503, detail="Invoice service is unavailable")
+
+
+async def apply_invoice_payment(invoice_id: int, amount: float) -> Dict[str, Any]:
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            res = await client.post(f"{INVOICE_SERVICE_URL}/invoices/{invoice_id}/apply_payment?paid_amount={amount}")
+            res.raise_for_status()
+            return res.json()
+    except httpx.RequestError:
+        raise HTTPException(status_code=503, detail="Invoice service is unavailable")
 
 
 class Payment:
@@ -70,12 +95,21 @@ async def get_payment(id: int):
     for payment in PAYMENTS:
         if payment.id == id:
             return payment
+    raise HTTPException(status_code=404, detail="Payment not found")
 
 
 @app.post("/payment/create_payment")
 async def create_payment(request_payment: PaymentRequest):
+    invoice = await fetch_invoice(request_payment.invoice_id)
+    if invoice.get("status", "").casefold() == "paid":
+        raise HTTPException(status_code=400, detail="Invoice is already fully paid")
+
     new_payment = Payment(**request_payment.dict())
-    PAYMENTS.append(find_payment_id(new_payment))
+    new_payment = find_payment_id(new_payment)
+    PAYMENTS.append(new_payment)
+
+    await apply_invoice_payment(request_payment.invoice_id, request_payment.amount)
+    return new_payment
 
 
 def find_payment_id(payment: Payment):
