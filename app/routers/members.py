@@ -1,79 +1,81 @@
-from fastapi import APIRouter, HTTPException
-
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, Path
+from sqlmodel import Session, select
 from app.models.member import Member
+from app.models.user import User
+from app.models.membership_plan import MembershipPlan
 from app.schemas.member import MemberRequest
-from app.database import db
+from app.database.session import get_session
 
-router = APIRouter()
-
-
-@router.get("")
-@router.get("/")
-async def get_all_members():
-    return db.MEMBERS
+router = APIRouter(tags=["Members"])
 
 
-@router.get("/get_by_status")
-async def get_by_status(status: str):
-    return [m for m in db.MEMBERS if m.status.casefold() == status.casefold()]
+@router.get("", response_model=List[Member])
+def get_all_members(session: Session = Depends(get_session)):
+    return session.exec(select(Member)).all()
 
 
-@router.get("/{id}")
-async def get_member(id: int):
-    member = db.find_member_by_id(id)
-    if member:
-        return member
-    raise HTTPException(status_code=404, detail="Member not found")
+@router.get("/get_by_status", response_model=List[Member])
+def get_members_by_status(status: str, session: Session = Depends(get_session)):
+    return session.exec(select(Member).where(Member.status == status.casefold())).all()
 
 
-@router.post("/create_member")
-async def create_member(request_member: MemberRequest):
-    user = db.find_user_by_id(request_member.user_id)
+@router.get("/{member_id}", response_model=Member)
+def get_member_by_id(member_id: int = Path(gt=0), session: Session = Depends(get_session)):
+    member = session.get(Member, member_id)
+    if not member:
+        raise HTTPException(status_code=404, detail=f"Member with id {member_id} not found")
+    return member
+
+
+@router.post("/create_member", response_model=Member)
+def create_member(req: MemberRequest, session: Session = Depends(get_session)):
+    user = session.get(User, req.user_id)
     if not user:
-        raise HTTPException(
-            status_code=400,
-            detail=f"User with id {request_member.user_id} does not exist",
-        )
+        raise HTTPException(status_code=400, detail=f"User with id {req.user_id} does not exist")
 
-    if request_member.membership_plan_id is not None:
-        plan = db.find_plan_by_id(request_member.membership_plan_id)
+    if req.membership_plan_id is not None:
+        plan = session.get(MembershipPlan, req.membership_plan_id)
         if not plan:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Membership plan {request_member.membership_plan_id} does not exist",
-            )
+            raise HTTPException(status_code=400, detail=f"Membership plan {req.membership_plan_id} does not exist")
 
-    new_member = Member(
-        id=db.get_next_id(db.MEMBERS),
-        user_id=request_member.user_id,
-        email=request_member.email,
-        status=request_member.status,
-        membership_plan_id=request_member.membership_plan_id,
-    )
-    db.MEMBERS.append(new_member)
+    new_member = Member.model_validate(req)
+    session.add(new_member)
+    session.commit()
+    session.refresh(new_member)
     return new_member
 
 
-@router.put("/update_member")
-async def update_member(request_member: MemberRequest):
-    for i, m in enumerate(db.MEMBERS):
-        if m.id == request_member.id:
-            updated = Member(
-                id=request_member.id,
-                user_id=request_member.user_id,
-                email=request_member.email,
-                status=request_member.status,
-                membership_plan_id=request_member.membership_plan_id,
-            )
-            db.MEMBERS[i] = updated
-            return updated
-    raise HTTPException(status_code=404, detail="Member not found")
+@router.put("/update_member", response_model=Member)
+def update_member(req: MemberRequest, session: Session = Depends(get_session)):
+    member = session.get(Member, req.id)
+    if not member:
+        raise HTTPException(status_code=404, detail=f"Member with id {req.id} not found")
+
+    user = session.get(User, req.user_id)
+    if not user:
+        raise HTTPException(status_code=400, detail=f"User with id {req.user_id} does not exist")
+
+    if req.membership_plan_id is not None:
+        plan = session.get(MembershipPlan, req.membership_plan_id)
+        if not plan:
+            raise HTTPException(status_code=400, detail=f"Membership plan {req.membership_plan_id} does not exist")
+
+    member.user_id = req.user_id
+    member.email = req.email
+    member.status = req.status
+    member.membership_plan_id = req.membership_plan_id
+    session.add(member)
+    session.commit()
+    session.refresh(member)
+    return member
 
 
-@router.delete("/delete_member/{id}")
-async def delete_member(id: int):
-    for i, m in enumerate(db.MEMBERS):
-        if m.id == id:
-            db.MEMBERS.pop(i)
-            return {"message": f"Member {id} deleted"}
-    raise HTTPException(status_code=404, detail="Member not found")
+@router.delete("/delete_member/{member_id}")
+def delete_member(member_id: int = Path(gt=0), session: Session = Depends(get_session)):
+    member = session.get(Member, member_id)
+    if not member:
+        raise HTTPException(status_code=404, detail=f"Member with id {member_id} not found")
+    session.delete(member)
+    session.commit()
+    return {"detail": f"Member {member_id} deleted successfully"}

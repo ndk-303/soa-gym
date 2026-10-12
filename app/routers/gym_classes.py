@@ -1,64 +1,60 @@
-from fastapi import APIRouter, HTTPException
-
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, Path
+from sqlmodel import Session, select
 from app.models.gym_class import GymClass
 from app.schemas.gym_class import GymClassRequest
-from app.database import db
+from app.database.session import get_session
 
-router = APIRouter()
-
-
-@router.get("")
-@router.get("/")
-async def get_all_classes():
-    return db.GYM_CLASSES
+router = APIRouter(tags=["Gym Classes"])
 
 
-@router.get("/get_by_category")
-async def get_by_category(category: str):
-    return [c for c in db.GYM_CLASSES if c.category.casefold() == category.casefold()]
+@router.get("", response_model=List[GymClass])
+def get_all_classes(session: Session = Depends(get_session)):
+    return session.exec(select(GymClass)).all()
 
 
-@router.get("/{id}")
-async def get_class(id: int):
-    gym_class = db.find_class_by_id(id)
-    if gym_class:
-        return gym_class
-    raise HTTPException(status_code=404, detail="Gym class not found")
+@router.get("/get_by_category", response_model=List[GymClass])
+def get_classes_by_category(category: str, session: Session = Depends(get_session)):
+    return session.exec(select(GymClass).where(GymClass.category == category.casefold())).all()
 
 
-@router.post("/create_class")
-async def create_class(request_class: GymClassRequest):
-    new_class = GymClass(
-        id=db.get_next_id(db.GYM_CLASSES),
-        name=request_class.name,
-        category=request_class.category,
-        trainer_id=request_class.trainer_id,
-        is_active=request_class.is_active,
-    )
-    db.GYM_CLASSES.append(new_class)
+@router.get("/{class_id}", response_model=GymClass)
+def get_class_by_id(class_id: int = Path(gt=0), session: Session = Depends(get_session)):
+    gym_class = session.get(GymClass, class_id)
+    if not gym_class:
+        raise HTTPException(status_code=404, detail=f"Gym class with id {class_id} not found")
+    return gym_class
+
+
+@router.post("/create_class", response_model=GymClass)
+def create_class(req: GymClassRequest, session: Session = Depends(get_session)):
+    new_class = GymClass.model_validate(req)
+    session.add(new_class)
+    session.commit()
+    session.refresh(new_class)
     return new_class
 
 
-@router.put("/update_class")
-async def update_class(request_class: GymClassRequest):
-    for i, c in enumerate(db.GYM_CLASSES):
-        if c.id == request_class.id:
-            updated = GymClass(
-                id=request_class.id,
-                name=request_class.name,
-                category=request_class.category,
-                trainer_id=request_class.trainer_id,
-                is_active=request_class.is_active,
-            )
-            db.GYM_CLASSES[i] = updated
-            return updated
-    raise HTTPException(status_code=404, detail="Gym class not found")
+@router.put("/update_class", response_model=GymClass)
+def update_class(req: GymClassRequest, session: Session = Depends(get_session)):
+    gym_class = session.get(GymClass, req.id)
+    if not gym_class:
+        raise HTTPException(status_code=404, detail=f"Gym class with id {req.id} not found")
+    gym_class.name = req.name
+    gym_class.category = req.category
+    gym_class.trainer_id = req.trainer_id
+    gym_class.is_active = req.is_active
+    session.add(gym_class)
+    session.commit()
+    session.refresh(gym_class)
+    return gym_class
 
 
-@router.delete("/delete_class/{id}")
-async def delete_class(id: int):
-    for i, c in enumerate(db.GYM_CLASSES):
-        if c.id == id:
-            db.GYM_CLASSES.pop(i)
-            return {"message": f"Gym class {id} deleted"}
-    raise HTTPException(status_code=404, detail="Gym class not found")
+@router.delete("/delete_class/{class_id}")
+def delete_class(class_id: int = Path(gt=0), session: Session = Depends(get_session)):
+    gym_class = session.get(GymClass, class_id)
+    if not gym_class:
+        raise HTTPException(status_code=404, detail=f"Gym class with id {class_id} not found")
+    session.delete(gym_class)
+    session.commit()
+    return {"detail": f"Gym class {class_id} deleted successfully"}

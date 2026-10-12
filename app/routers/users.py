@@ -1,62 +1,59 @@
-from fastapi import APIRouter, HTTPException
-
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, Path
+from sqlmodel import Session, select
 from app.models.user import User
 from app.schemas.user import UserRequest
-from app.database import db
+from app.database.session import get_session
 
-router = APIRouter()
-
-
-@router.get("")
-@router.get("/")
-async def get_all_users():
-    return db.USERS
+router = APIRouter(tags=["Users"])
 
 
-@router.get("/get_role")
-async def get_by_role(role: str):
-    return [u for u in db.USERS if u.role.casefold() == role.casefold()]
+@router.get("", response_model=List[User])
+def get_all_users(session: Session = Depends(get_session)):
+    return session.exec(select(User)).all()
 
 
-@router.get("/{id}")
-async def get_user(id: int):
-    user = db.find_user_by_id(id)
-    if user:
-        return user
-    raise HTTPException(status_code=404, detail="User not found")
+@router.get("/get_role", response_model=List[User])
+def get_users_by_role(role: str, session: Session = Depends(get_session)):
+    return session.exec(select(User).where(User.role == role.casefold())).all()
 
 
-@router.post("/create_user")
-async def create_user(request_user: UserRequest):
-    new_user = User(
-        id=db.get_next_id(db.USERS),
-        email=request_user.email,
-        role=request_user.role,
-        password=request_user.password,
-    )
-    db.USERS.append(new_user)
+@router.get("/{user_id}", response_model=User)
+def get_user_by_id(user_id: int = Path(gt=0), session: Session = Depends(get_session)):
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User with id {user_id} not found")
+    return user
+
+
+@router.post("/create_user", response_model=User)
+def create_user(req: UserRequest, session: Session = Depends(get_session)):
+    new_user = User.model_validate(req)
+    session.add(new_user)
+    session.commit()
+    session.refresh(new_user)
     return new_user
 
 
-@router.put("/update_user")
-async def update_user(request_user: UserRequest):
-    for i, u in enumerate(db.USERS):
-        if u.id == request_user.id:
-            updated = User(
-                id=request_user.id,
-                email=request_user.email,
-                role=request_user.role,
-                password=request_user.password,
-            )
-            db.USERS[i] = updated
-            return updated
-    raise HTTPException(status_code=404, detail="User not found")
+@router.put("/update_user", response_model=User)
+def update_user(req: UserRequest, session: Session = Depends(get_session)):
+    user = session.get(User, req.id)
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User with id {req.id} not found")
+    user.email = req.email
+    user.role = req.role
+    user.password = req.password
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
 
 
-@router.delete("/delete_user/{id}")
-async def delete_user(id: int):
-    for i, u in enumerate(db.USERS):
-        if u.id == id:
-            db.USERS.pop(i)
-            return {"message": f"User {id} deleted"}
-    raise HTTPException(status_code=404, detail="User not found")
+@router.delete("/delete_user/{user_id}")
+def delete_user(user_id: int = Path(gt=0), session: Session = Depends(get_session)):
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User with id {user_id} not found")
+    session.delete(user)
+    session.commit()
+    return {"detail": f"User {user_id} deleted successfully"}

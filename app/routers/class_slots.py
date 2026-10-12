@@ -1,75 +1,61 @@
-from fastapi import APIRouter, HTTPException
-
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, Path
+from sqlmodel import Session, select
 from app.models.class_slot import ClassSlot
 from app.schemas.class_slot import ClassSlotRequest
-from app.database import db
+from app.database.session import get_session
 
-router = APIRouter()
-
-
-@router.get("")
-@router.get("/")
-async def get_all_slots():
-    return db.CLASS_SLOTS
+router = APIRouter(tags=["Class Slots"])
 
 
-@router.get("/get_by_class")
-async def get_by_class(class_id: int):
-    return [s for s in db.CLASS_SLOTS if s.class_id == class_id]
+@router.get("", response_model=List[ClassSlot])
+def get_all_slots(session: Session = Depends(get_session)):
+    return session.exec(select(ClassSlot)).all()
 
 
-@router.get("/{id}")
-async def get_slot(id: int):
-    slot = db.find_slot_by_id(id)
-    if slot:
-        return slot
-    raise HTTPException(status_code=404, detail="Class slot not found")
+@router.get("/get_by_class", response_model=List[ClassSlot])
+def get_slots_by_class(class_id: int, session: Session = Depends(get_session)):
+    return session.exec(select(ClassSlot).where(ClassSlot.class_id == class_id)).all()
 
 
-@router.post("/create_slot")
-async def create_slot(request_slot: ClassSlotRequest):
-    new_slot = ClassSlot(
-        id=db.get_next_id(db.CLASS_SLOTS),
-        class_id=request_slot.class_id,
-        start_time=request_slot.start_time,
-        max_capacity=request_slot.max_capacity,
-        current_bookings=request_slot.current_bookings,
-        is_cancelled=request_slot.is_cancelled,
-    )
-    db.CLASS_SLOTS.append(new_slot)
-    return new_slot
-
-
-@router.post("/{id}/increment_booking")
-async def increment_booking(id: int):
-    slot = db.find_slot_by_id(id)
+@router.get("/{slot_id}", response_model=ClassSlot)
+def get_slot_by_id(slot_id: int = Path(gt=0), session: Session = Depends(get_session)):
+    slot = session.get(ClassSlot, slot_id)
     if not slot:
-        raise HTTPException(status_code=404, detail="Class slot not found")
-    slot.current_bookings += 1
+        raise HTTPException(status_code=404, detail=f"Class slot with id {slot_id} not found")
     return slot
 
 
-@router.put("/update_slot")
-async def update_slot(request_slot: ClassSlotRequest):
-    for i, s in enumerate(db.CLASS_SLOTS):
-        if s.id == request_slot.id:
-            updated = ClassSlot(
-                id=request_slot.id,
-                class_id=request_slot.class_id,
-                start_time=request_slot.start_time,
-                max_capacity=request_slot.max_capacity,
-                current_bookings=request_slot.current_bookings,
-                is_cancelled=request_slot.is_cancelled,
-            )
-            db.CLASS_SLOTS[i] = updated
-            return updated
-    raise HTTPException(status_code=404, detail="Class slot not found")
+@router.post("/create_slot", response_model=ClassSlot)
+def create_slot(req: ClassSlotRequest, session: Session = Depends(get_session)):
+    new_slot = ClassSlot.model_validate(req)
+    session.add(new_slot)
+    session.commit()
+    session.refresh(new_slot)
+    return new_slot
 
 
-@router.delete("/delete_slot/{id}")
-async def delete_slot(id: int):
-    for i, s in enumerate(db.CLASS_SLOTS):
-        if s.id == id:
-            db.CLASS_SLOTS.pop(i)
-            return {"message": f"Class slot {id} deleted"}
-    raise HTTPException(status_code=404, detail="Class slot not found")
+@router.put("/update_slot", response_model=ClassSlot)
+def update_slot(req: ClassSlotRequest, session: Session = Depends(get_session)):
+    slot = session.get(ClassSlot, req.id)
+    if not slot:
+        raise HTTPException(status_code=404, detail=f"Class slot with id {req.id} not found")
+    slot.class_id = req.class_id
+    slot.start_time = req.start_time
+    slot.max_capacity = req.max_capacity
+    slot.current_bookings = req.current_bookings
+    slot.is_cancelled = req.is_cancelled
+    session.add(slot)
+    session.commit()
+    session.refresh(slot)
+    return slot
+
+
+@router.delete("/delete_slot/{slot_id}")
+def delete_slot(slot_id: int = Path(gt=0), session: Session = Depends(get_session)):
+    slot = session.get(ClassSlot, slot_id)
+    if not slot:
+        raise HTTPException(status_code=404, detail=f"Class slot with id {slot_id} not found")
+    session.delete(slot)
+    session.commit()
+    return {"detail": f"Class slot {slot_id} deleted successfully"}

@@ -1,75 +1,60 @@
-from fastapi import APIRouter, HTTPException
-
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, Path
+from sqlmodel import Session, select
 from app.models.invoice import Invoice
 from app.schemas.invoice import InvoiceRequest
-from app.database import db
+from app.database.session import get_session
 
-router = APIRouter()
-
-
-@router.get("")
-@router.get("/")
-async def get_all_invoices():
-    return db.INVOICES
+router = APIRouter(tags=["Invoices"])
 
 
-@router.get("/get_by_status")
-async def get_by_status(status: str):
-    return [inv for inv in db.INVOICES if inv.status.casefold() == status.casefold()]
+@router.get("", response_model=List[Invoice])
+def get_all_invoices(session: Session = Depends(get_session)):
+    return session.exec(select(Invoice)).all()
 
 
-@router.get("/{id}")
-async def get_invoice(id: int):
-    inv = db.find_invoice_by_id(id)
-    if inv:
-        return inv
-    raise HTTPException(status_code=404, detail="Invoice not found")
+@router.get("/get_by_status", response_model=List[Invoice])
+def get_invoices_by_status(status: str, session: Session = Depends(get_session)):
+    return session.exec(select(Invoice).where(Invoice.status == status.casefold())).all()
 
 
-@router.post("/create_invoice")
-async def create_invoice(request_invoice: InvoiceRequest):
-    new_invoice = Invoice(
-        id=db.get_next_id(db.INVOICES),
-        member_id=request_invoice.member_id,
-        amount=request_invoice.amount,
-        amount_paid=request_invoice.amount_paid,
-        status=request_invoice.status,
-    )
-    db.INVOICES.append(new_invoice)
+@router.get("/{invoice_id}", response_model=Invoice)
+def get_invoice_by_id(invoice_id: int = Path(gt=0), session: Session = Depends(get_session)):
+    invoice = session.get(Invoice, invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail=f"Invoice with id {invoice_id} not found")
+    return invoice
+
+
+@router.post("/create_invoice", response_model=Invoice)
+def create_invoice(req: InvoiceRequest, session: Session = Depends(get_session)):
+    new_invoice = Invoice.model_validate(req)
+    session.add(new_invoice)
+    session.commit()
+    session.refresh(new_invoice)
     return new_invoice
 
 
-@router.post("/{id}/apply_payment")
-async def apply_payment(id: int, paid_amount: float):
-    inv = db.find_invoice_by_id(id)
-    if not inv:
-        raise HTTPException(status_code=404, detail="Invoice not found")
-    inv.amount_paid += paid_amount
-    if inv.amount_paid >= inv.amount:
-        inv.status = "paid"
-    return inv
+@router.put("/update_invoice", response_model=Invoice)
+def update_invoice(req: InvoiceRequest, session: Session = Depends(get_session)):
+    invoice = session.get(Invoice, req.id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail=f"Invoice with id {req.id} not found")
+    invoice.member_id = req.member_id
+    invoice.amount = req.amount
+    invoice.amount_paid = req.amount_paid
+    invoice.status = req.status
+    session.add(invoice)
+    session.commit()
+    session.refresh(invoice)
+    return invoice
 
 
-@router.put("/update_invoice")
-async def update_invoice(request_invoice: InvoiceRequest):
-    for i, inv in enumerate(db.INVOICES):
-        if inv.id == request_invoice.id:
-            updated = Invoice(
-                id=request_invoice.id,
-                member_id=request_invoice.member_id,
-                amount=request_invoice.amount,
-                amount_paid=request_invoice.amount_paid,
-                status=request_invoice.status,
-            )
-            db.INVOICES[i] = updated
-            return updated
-    raise HTTPException(status_code=404, detail="Invoice not found")
-
-
-@router.delete("/delete_invoice/{id}")
-async def delete_invoice(id: int):
-    for i, inv in enumerate(db.INVOICES):
-        if inv.id == id:
-            db.INVOICES.pop(i)
-            return {"message": f"Invoice {id} deleted"}
-    raise HTTPException(status_code=404, detail="Invoice not found")
+@router.delete("/delete_invoice/{invoice_id}")
+def delete_invoice(invoice_id: int = Path(gt=0), session: Session = Depends(get_session)):
+    invoice = session.get(Invoice, invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail=f"Invoice with id {invoice_id} not found")
+    session.delete(invoice)
+    session.commit()
+    return {"detail": f"Invoice {invoice_id} deleted successfully"}

@@ -1,66 +1,61 @@
-from fastapi import APIRouter, HTTPException
-
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, Path
+from sqlmodel import Session, select
 from app.models.attendance import AttendanceRecord
 from app.schemas.attendance import AttendanceRecordRequest
-from app.database import db
+from app.database.session import get_session
 
-router = APIRouter()
-
-
-@router.get("")
-@router.get("/")
-async def get_all_attendance():
-    return db.ATTENDANCE_RECORDS
+router = APIRouter(tags=["Attendance"])
 
 
-@router.get("/get_by_status")
-async def get_by_status(status: str):
-    return [a for a in db.ATTENDANCE_RECORDS if a.status.casefold() == status.casefold()]
+@router.get("", response_model=List[AttendanceRecord])
+def get_all_attendance(session: Session = Depends(get_session)):
+    return session.exec(select(AttendanceRecord)).all()
 
 
-@router.get("/{id}")
-async def get_attendance(id: int):
-    record = db.find_attendance_by_id(id)
-    if record:
-        return record
-    raise HTTPException(status_code=404, detail="Attendance record not found")
+@router.get("/get_by_status", response_model=List[AttendanceRecord])
+def get_attendance_by_status(status: str, session: Session = Depends(get_session)):
+    return session.exec(select(AttendanceRecord).where(AttendanceRecord.status == status.casefold())).all()
 
 
-@router.post("/create_record")
-async def create_record(request_record: AttendanceRecordRequest):
-    new_record = AttendanceRecord(
-        id=db.get_next_id(db.ATTENDANCE_RECORDS),
-        member_id=request_record.member_id,
-        status=request_record.status,
-        check_in_time=request_record.check_in_time,
-        check_out_time=request_record.check_out_time,
-        notes=request_record.notes,
-    )
-    db.ATTENDANCE_RECORDS.append(new_record)
+@router.get("/{attendance_id}", response_model=AttendanceRecord)
+def get_attendance_by_id(attendance_id: int = Path(gt=0), session: Session = Depends(get_session)):
+    record = session.get(AttendanceRecord, attendance_id)
+    if not record:
+        raise HTTPException(status_code=404, detail=f"Attendance record with id {attendance_id} not found")
+    return record
+
+
+@router.post("/create_attendance", response_model=AttendanceRecord)
+def create_attendance(req: AttendanceRecordRequest, session: Session = Depends(get_session)):
+    new_record = AttendanceRecord.model_validate(req)
+    session.add(new_record)
+    session.commit()
+    session.refresh(new_record)
     return new_record
 
 
-@router.put("/update_record")
-async def update_record(request_record: AttendanceRecordRequest):
-    for i, a in enumerate(db.ATTENDANCE_RECORDS):
-        if a.id == request_record.id:
-            updated = AttendanceRecord(
-                id=request_record.id,
-                member_id=request_record.member_id,
-                status=request_record.status,
-                check_in_time=request_record.check_in_time,
-                check_out_time=request_record.check_out_time,
-                notes=request_record.notes,
-            )
-            db.ATTENDANCE_RECORDS[i] = updated
-            return updated
-    raise HTTPException(status_code=404, detail="Attendance record not found")
+@router.put("/update_attendance", response_model=AttendanceRecord)
+def update_attendance(req: AttendanceRecordRequest, session: Session = Depends(get_session)):
+    record = session.get(AttendanceRecord, req.id)
+    if not record:
+        raise HTTPException(status_code=404, detail=f"Attendance record with id {req.id} not found")
+    record.member_id = req.member_id
+    record.status = req.status
+    record.check_in_time = req.check_in_time
+    record.check_out_time = req.check_out_time
+    record.notes = req.notes
+    session.add(record)
+    session.commit()
+    session.refresh(record)
+    return record
 
 
-@router.delete("/delete_record/{id}")
-async def delete_record(id: int):
-    for i, a in enumerate(db.ATTENDANCE_RECORDS):
-        if a.id == id:
-            db.ATTENDANCE_RECORDS.pop(i)
-            return {"message": f"Attendance record {id} deleted"}
-    raise HTTPException(status_code=404, detail="Attendance record not found")
+@router.delete("/delete_attendance/{attendance_id}")
+def delete_attendance(attendance_id: int = Path(gt=0), session: Session = Depends(get_session)):
+    record = session.get(AttendanceRecord, attendance_id)
+    if not record:
+        raise HTTPException(status_code=404, detail=f"Attendance record with id {attendance_id} not found")
+    session.delete(record)
+    session.commit()
+    return {"detail": f"Attendance record {attendance_id} deleted successfully"}
