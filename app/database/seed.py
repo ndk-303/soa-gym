@@ -16,6 +16,7 @@ def seed_database(session: Session) -> None:
     if existing_user is not None:
         return
 
+    # Tier 1: Independent tables
     users = [
         User(id=1, email="admin@gym.com", role="admin", password="admin123"),
         User(id=2, email="trainer.nam@gym.com", role="trainer", password="trainer123"),
@@ -35,7 +36,9 @@ def seed_database(session: Session) -> None:
     ]
     for p in plans:
         session.add(p)
+    session.flush()
 
+    # Tier 2: Tables depending on User and MembershipPlan
     members = [
         Member(id=1, user_id=4, email="member.an@gym.com", status="active", membership_plan_id=1),
         Member(id=2, user_id=5, email="member.binh@gym.com", status="active", membership_plan_id=2),
@@ -52,7 +55,9 @@ def seed_database(session: Session) -> None:
     ]
     for gc in gym_classes:
         session.add(gc)
+    session.flush()
 
+    # Tier 3: ClassSlots depending on GymClass
     slots = [
         ClassSlot(id=1, class_id=1, start_time="2026-10-12 08:00:00", max_capacity=15, current_bookings=5, is_cancelled=False),
         ClassSlot(id=2, class_id=2, start_time="2026-10-12 10:00:00", max_capacity=10, current_bookings=8, is_cancelled=False),
@@ -61,7 +66,9 @@ def seed_database(session: Session) -> None:
     ]
     for s in slots:
         session.add(s)
+    session.flush()
 
+    # Tier 4: Bookings & Invoices depending on Member and ClassSlot
     bookings = [
         Booking(id=1, member_id=1, slot_id=1, status="confirmed", waitlist_position=None),
         Booking(id=2, member_id=2, slot_id=2, status="confirmed", waitlist_position=None),
@@ -79,7 +86,9 @@ def seed_database(session: Session) -> None:
     ]
     for inv in invoices:
         session.add(inv)
+    session.flush()
 
+    # Tier 5: Payments & AttendanceRecords depending on Invoice & Member
     payments = [
         Payment(id=1, invoice_id=1, amount=500000.0, payment_method="cash", notes="Thanh toan tien mat"),
         Payment(id=2, invoice_id=3, amount=1000000.0, payment_method="bank_transfer", notes="Chuyen khoan dot 1"),

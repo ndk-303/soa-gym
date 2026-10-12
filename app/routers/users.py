@@ -28,6 +28,9 @@ def get_user_by_id(user_id: int = Path(gt=0), session: Session = Depends(get_ses
 
 @router.post("/create_user", response_model=User)
 def create_user(req: UserRequest, session: Session = Depends(get_session)):
+    existing = session.exec(select(User).where(User.email == req.email)).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="User with this email already exists")
     new_user = User.model_validate(req)
     session.add(new_user)
     session.commit()
@@ -40,6 +43,10 @@ def update_user(req: UserRequest, session: Session = Depends(get_session)):
     user = session.get(User, req.id)
     if not user:
         raise HTTPException(status_code=404, detail=f"User with id {req.id} not found")
+    if req.email != user.email:
+        existing = session.exec(select(User).where(User.email == req.email)).first()
+        if existing and existing.id != user.id:
+            raise HTTPException(status_code=400, detail="User with this email already exists")
     user.email = req.email
     user.role = req.role
     user.password = req.password

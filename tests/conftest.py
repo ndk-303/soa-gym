@@ -8,11 +8,18 @@ from app.database.seed import seed_database
 
 @pytest.fixture(name="session")
 def session_fixture():
+    from sqlalchemy import event
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     SQLModel.metadata.create_all(engine)
     with Session(engine) as session:
         seed_database(session)

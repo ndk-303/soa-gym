@@ -16,6 +16,17 @@ async def test_users_router(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_users_router_duplicate_email(client: AsyncClient):
+    res_dup = await client.post("/users/create_user", json={
+        "email": "admin@gym.com",
+        "role": "admin",
+        "password": "newpassword123"
+    })
+    assert res_dup.status_code == 400
+    assert "already exists" in res_dup.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
 async def test_member_creation_in_memory_validation(client: AsyncClient):
     # Invalid user_id
     res_bad_user = await client.post("/members/create_member", json={
@@ -77,6 +88,10 @@ async def test_booking_slot_capacity_and_waitlist_in_memory(client: AsyncClient,
     assert res_wait.status_code == 200
     assert res_wait.json()["status"] == "waitlisted"
     assert res_wait.json()["waitlist_position"] == 2
+
+    session.expire_all()
+    slot3 = session.get(ClassSlot, 3)
+    assert slot3.current_bookings == 20
 
     # Slot 4 is cancelled -> rejected with 400
     res_cancelled = await client.post("/bookings/create_booking", json={
