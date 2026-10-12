@@ -20,7 +20,7 @@ async def test_full_api_monolith_lifecycle():
         # 2. Users CRUD
         res_users = await client.get("/users")
         assert res_users.status_code == 200
-        assert len(res_users.json()) == 4
+        assert len(res_users.json()) == 6
 
         res_user_role = await client.get("/users/get_role?role=trainer")
         assert res_user_role.status_code == 200
@@ -33,7 +33,7 @@ async def test_full_api_monolith_lifecycle():
         })
         assert res_new_user.status_code == 200
         new_user_id = res_new_user.json()["id"]
-        assert new_user_id == 5
+        assert new_user_id == 7
 
         # 3. Plans CRUD
         res_plans = await client.get("/membership_plans")
@@ -111,6 +111,14 @@ async def test_full_api_monolith_lifecycle():
         assert res_book_wait.status_code == 200
         assert res_book_wait.json()["status"] == "waitlisted"
         assert res_book_wait.json()["waitlist_position"] == 2
+
+        # Slot 4: cancelled slot -> rejected with 400
+        res_book_cancelled = await client.post("/bookings/create_booking", json={
+            "member_id": new_mem_id,
+            "slot_id": 4
+        })
+        assert res_book_cancelled.status_code == 400
+        assert "cancelled" in res_book_cancelled.json()["detail"].lower()
 
         # 7. Invoices & Payments Workflow
         # Invoice 2 pending (1,350,000, paid=0.0)

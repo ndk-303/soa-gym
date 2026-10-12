@@ -60,7 +60,7 @@ gym-models/
 │   │   └── db.py
 │   ├── routers/           # FastAPI APIRouters (CRUD & Domain Logic)
 │   │   ├── users.py
-│   │   ├── membership_plan.py
+│   │   ├── membership_plans.py
 │   │   ├── members.py
 │   │   ├── gym_classes.py
 │   │   ├── class_slots.py

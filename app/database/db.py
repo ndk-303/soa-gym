@@ -30,6 +30,8 @@ def reset_database():
         User(2, "trainer.nam@gym.com", "trainer", "trainer123"),
         User(3, "trainer.hoa@gym.com", "trainer", "trainer123"),
         User(4, "member.an@gym.com", "member", "member123"),
+        User(5, "member.binh@gym.com", "member", "member123"),
+        User(6, "member.chi@gym.com", "member", "member123"),
     ])
 
     MEMBERSHIP_PLANS.clear()
@@ -99,7 +101,7 @@ reset_database()
 
 
 def get_next_id(collection: List[Any]) -> int:
-    return 1 if len(collection) == 0 else collection[-1].id + 1
+    return max((getattr(item, "id", 0) for item in collection), default=0) + 1
 
 
 def find_user_by_id(user_id: int) -> Optional[User]:
