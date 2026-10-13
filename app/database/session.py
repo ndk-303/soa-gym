@@ -1,8 +1,10 @@
 import os
 from typing import Generator
-from sqlmodel import SQLModel, Session, create_engine
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import Session
 
-# Import all models to ensure SQLModel.metadata registers them all
+# Import all models to ensure Base.metadata registers them all
+from app.models.base import Base
 from app.models.user import User
 from app.models.membership_plan import MembershipPlan
 from app.models.member import Member
@@ -12,9 +14,6 @@ from app.models.booking import Booking
 from app.models.invoice import Invoice
 from app.models.payment import Payment
 from app.models.attendance import AttendanceRecord
-
-from sqlalchemy import event
-from sqlalchemy.engine import Engine
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///gym.db")
 
@@ -33,7 +32,7 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
 
 
 def create_db_and_tables() -> None:
-    SQLModel.metadata.create_all(engine)
+    Base.metadata.create_all(engine)
 
 
 def get_session() -> Generator[Session, None, None]:

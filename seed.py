@@ -1,4 +1,4 @@
-from sqlmodel import Session
+from sqlalchemy.orm import Session
 from app.database.session import engine, create_db_and_tables
 from app.database.seed import seed_database
 

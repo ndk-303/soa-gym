@@ -1,10 +1,14 @@
 from typing import Optional
-from sqlmodel import Field, SQLModel
+from sqlalchemy import String, Integer, Float, Boolean
+from sqlalchemy.orm import Mapped, mapped_column
+from app.models.base import Base
 
 
-class MembershipPlan(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str
-    duration_days: int
-    price: float
-    is_active: bool = Field(default=True)
+class MembershipPlan(Base):
+    __tablename__ = "membershipplan"
+
+    id: Mapped[Optional[int]] = mapped_column(primary_key=True, autoincrement=True, default=None)
+    name: Mapped[str] = mapped_column(String)
+    duration_days: Mapped[int] = mapped_column(Integer)
+    price: Mapped[float] = mapped_column(Float)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)

@@ -1,10 +1,14 @@
 from typing import Optional
-from sqlmodel import Field, SQLModel
+from sqlalchemy import String, Integer, Float, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column
+from app.models.base import Base
 
 
-class Invoice(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    member_id: int = Field(foreign_key="member.id")
-    amount: float
-    amount_paid: float = Field(default=0.0)
-    status: str = Field(default="pending")
+class Invoice(Base):
+    __tablename__ = "invoice"
+
+    id: Mapped[Optional[int]] = mapped_column(primary_key=True, autoincrement=True, default=None)
+    member_id: Mapped[int] = mapped_column(Integer, ForeignKey("member.id"))
+    amount: Mapped[float] = mapped_column(Float)
+    amount_paid: Mapped[float] = mapped_column(Float, default=0.0)
+    status: Mapped[str] = mapped_column(String, default="pending")

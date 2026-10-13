@@ -11,6 +11,7 @@ class ClassSlotRequest(BaseModel):
     is_cancelled: bool = Field(default=False)
 
     model_config = ConfigDict(
+        from_attributes=True,
         json_schema_extra={
             'example': {
                 'class_id': 1,
@@ -21,3 +22,6 @@ class ClassSlotRequest(BaseModel):
             }
         }
     )
+
+
+ClassSlotResponse = ClassSlotRequest

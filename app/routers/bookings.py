@@ -1,26 +1,27 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Path
-from sqlmodel import Session, select
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 from app.models.booking import Booking
 from app.models.member import Member
 from app.models.class_slot import ClassSlot
-from app.schemas.booking import BookingRequest
+from app.schemas.booking import BookingRequest, BookingResponse
 from app.database.session import get_session
 
 router = APIRouter(tags=["Bookings"])
 
 
-@router.get("", response_model=List[Booking])
+@router.get("", response_model=List[BookingResponse])
 def get_all_bookings(session: Session = Depends(get_session)):
-    return session.exec(select(Booking)).all()
+    return session.scalars(select(Booking)).all()
 
 
-@router.get("/get_by_status", response_model=List[Booking])
+@router.get("/get_by_status", response_model=List[BookingResponse])
 def get_bookings_by_status(status: str, session: Session = Depends(get_session)):
-    return session.exec(select(Booking).where(Booking.status == status.casefold())).all()
+    return session.scalars(select(Booking).where(Booking.status == status.casefold())).all()
 
 
-@router.get("/{booking_id}", response_model=Booking)
+@router.get("/{booking_id}", response_model=BookingResponse)
 def get_booking_by_id(booking_id: int = Path(gt=0), session: Session = Depends(get_session)):
     booking = session.get(Booking, booking_id)
     if not booking:
@@ -28,7 +29,7 @@ def get_booking_by_id(booking_id: int = Path(gt=0), session: Session = Depends(g
     return booking
 
 
-@router.post("/create_booking", response_model=Booking)
+@router.post("/create_booking", response_model=BookingResponse)
 def create_booking(req: BookingRequest, session: Session = Depends(get_session)):
     member = session.get(Member, req.member_id)
     if not member or member.status.casefold() != "active":
@@ -48,7 +49,7 @@ def create_booking(req: BookingRequest, session: Session = Depends(get_session))
         session.add(slot)
     else:
         booking_status = "waitlisted"
-        existing_waitlist = session.exec(
+        existing_waitlist = session.scalars(
             select(Booking).where(Booking.slot_id == slot.id, Booking.status == "waitlisted")
         ).all()
         waitlist_pos = len(existing_waitlist) + 1
@@ -65,7 +66,7 @@ def create_booking(req: BookingRequest, session: Session = Depends(get_session))
     return new_booking
 
 
-@router.put("/update_booking", response_model=Booking)
+@router.put("/update_booking", response_model=BookingResponse)
 def update_booking(req: BookingRequest, session: Session = Depends(get_session)):
     booking = session.get(Booking, req.id)
     if not booking:

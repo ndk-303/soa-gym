@@ -1,4 +1,4 @@
-from sqlmodel import SQLModel
+from app.models.base import Base
 from app.models.user import User
 from app.models.membership_plan import MembershipPlan
 from app.models.member import Member
@@ -12,7 +12,7 @@ from app.models.attendance import AttendanceRecord
 
 def test_models_table_metadata():
     for model_cls in [User, MembershipPlan, Member, GymClass, ClassSlot, Booking, Invoice, Payment, AttendanceRecord]:
-        assert issubclass(model_cls, SQLModel)
+        assert issubclass(model_cls, Base)
         assert hasattr(model_cls, "__tablename__")
         assert getattr(model_cls, "__tablename__") is not None
 

@@ -1,4 +1,5 @@
-from sqlmodel import Session, select
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 from app.models.user import User
 from app.models.membership_plan import MembershipPlan
 from app.models.member import Member
@@ -12,7 +13,7 @@ from app.models.attendance import AttendanceRecord
 
 def seed_database(session: Session) -> None:
     # Check if already seeded to prevent duplication
-    existing_user = session.exec(select(User)).first()
+    existing_user = session.scalars(select(User)).first()
     if existing_user is not None:
         return
 

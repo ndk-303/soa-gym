@@ -8,9 +8,10 @@ class AttendanceRecordRequest(BaseModel):
     status: str = Field(default="checked_in", min_length=5, max_length=20)
     check_in_time: str = Field(min_length=10, max_length=30)
     check_out_time: Optional[str] = Field(default=None)
-    notes: Optional[str] = Field(default="", max_length=255)
+    notes: Optional[str] = Field(default=None, max_length=255)
 
     model_config = ConfigDict(
+        from_attributes=True,
         json_schema_extra={
             'example': {
                 'member_id': 1,
@@ -21,3 +22,6 @@ class AttendanceRecordRequest(BaseModel):
             }
         }
     )
+
+
+AttendanceRecordResponse = AttendanceRecordRequest

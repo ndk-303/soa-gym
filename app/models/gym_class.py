@@ -1,10 +1,14 @@
 from typing import Optional
-from sqlmodel import Field, SQLModel
+from sqlalchemy import String, Integer, Boolean, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column
+from app.models.base import Base
 
 
-class GymClass(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str
-    category: str
-    trainer_id: int = Field(foreign_key="user.id")
-    is_active: bool = Field(default=True)
+class GymClass(Base):
+    __tablename__ = "gymclass"
+
+    id: Mapped[Optional[int]] = mapped_column(primary_key=True, autoincrement=True, default=None)
+    name: Mapped[str] = mapped_column(String)
+    category: Mapped[str] = mapped_column(String)
+    trainer_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)

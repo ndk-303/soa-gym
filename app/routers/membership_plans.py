@@ -1,24 +1,25 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Path
-from sqlmodel import Session, select
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 from app.models.membership_plan import MembershipPlan
-from app.schemas.membership_plan import MembershipPlanRequest
+from app.schemas.membership_plan import MembershipPlanRequest, MembershipPlanResponse
 from app.database.session import get_session
 
 router = APIRouter(tags=["Membership Plans"])
 
 
-@router.get("", response_model=List[MembershipPlan])
+@router.get("", response_model=List[MembershipPlanResponse])
 def get_all_plans(session: Session = Depends(get_session)):
-    return session.exec(select(MembershipPlan)).all()
+    return session.scalars(select(MembershipPlan)).all()
 
 
-@router.get("/get_by_duration", response_model=List[MembershipPlan])
+@router.get("/get_by_duration", response_model=List[MembershipPlanResponse])
 def get_plans_by_duration(duration_days: int, session: Session = Depends(get_session)):
-    return session.exec(select(MembershipPlan).where(MembershipPlan.duration_days == duration_days)).all()
+    return session.scalars(select(MembershipPlan).where(MembershipPlan.duration_days == duration_days)).all()
 
 
-@router.get("/{plan_id}", response_model=MembershipPlan)
+@router.get("/{plan_id}", response_model=MembershipPlanResponse)
 def get_plan_by_id(plan_id: int = Path(gt=0), session: Session = Depends(get_session)):
     plan = session.get(MembershipPlan, plan_id)
     if not plan:
@@ -26,16 +27,16 @@ def get_plan_by_id(plan_id: int = Path(gt=0), session: Session = Depends(get_ses
     return plan
 
 
-@router.post("/create_plan", response_model=MembershipPlan)
+@router.post("/create_plan", response_model=MembershipPlanResponse)
 def create_plan(req: MembershipPlanRequest, session: Session = Depends(get_session)):
-    new_plan = MembershipPlan.model_validate(req)
+    new_plan = MembershipPlan(**req.model_dump(exclude={"id"}))
     session.add(new_plan)
     session.commit()
     session.refresh(new_plan)
     return new_plan
 
 
-@router.put("/update_plan", response_model=MembershipPlan)
+@router.put("/update_plan", response_model=MembershipPlanResponse)
 def update_plan(req: MembershipPlanRequest, session: Session = Depends(get_session)):
     plan = session.get(MembershipPlan, req.id)
     if not plan:

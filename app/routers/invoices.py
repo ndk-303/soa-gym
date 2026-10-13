@@ -1,24 +1,25 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Path
-from sqlmodel import Session, select
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 from app.models.invoice import Invoice
-from app.schemas.invoice import InvoiceRequest
+from app.schemas.invoice import InvoiceRequest, InvoiceResponse
 from app.database.session import get_session
 
 router = APIRouter(tags=["Invoices"])
 
 
-@router.get("", response_model=List[Invoice])
+@router.get("", response_model=List[InvoiceResponse])
 def get_all_invoices(session: Session = Depends(get_session)):
-    return session.exec(select(Invoice)).all()
+    return session.scalars(select(Invoice)).all()
 
 
-@router.get("/get_by_status", response_model=List[Invoice])
+@router.get("/get_by_status", response_model=List[InvoiceResponse])
 def get_invoices_by_status(status: str, session: Session = Depends(get_session)):
-    return session.exec(select(Invoice).where(Invoice.status == status.casefold())).all()
+    return session.scalars(select(Invoice).where(Invoice.status == status.casefold())).all()
 
 
-@router.get("/{invoice_id}", response_model=Invoice)
+@router.get("/{invoice_id}", response_model=InvoiceResponse)
 def get_invoice_by_id(invoice_id: int = Path(gt=0), session: Session = Depends(get_session)):
     invoice = session.get(Invoice, invoice_id)
     if not invoice:
@@ -26,16 +27,16 @@ def get_invoice_by_id(invoice_id: int = Path(gt=0), session: Session = Depends(g
     return invoice
 
 
-@router.post("/create_invoice", response_model=Invoice)
+@router.post("/create_invoice", response_model=InvoiceResponse)
 def create_invoice(req: InvoiceRequest, session: Session = Depends(get_session)):
-    new_invoice = Invoice.model_validate(req)
+    new_invoice = Invoice(**req.model_dump(exclude={"id"}))
     session.add(new_invoice)
     session.commit()
     session.refresh(new_invoice)
     return new_invoice
 
 
-@router.put("/update_invoice", response_model=Invoice)
+@router.put("/update_invoice", response_model=InvoiceResponse)
 def update_invoice(req: InvoiceRequest, session: Session = Depends(get_session)):
     invoice = session.get(Invoice, req.id)
     if not invoice:

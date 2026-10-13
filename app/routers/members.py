@@ -1,26 +1,27 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Path
-from sqlmodel import Session, select
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 from app.models.member import Member
 from app.models.user import User
 from app.models.membership_plan import MembershipPlan
-from app.schemas.member import MemberRequest
+from app.schemas.member import MemberRequest, MemberResponse
 from app.database.session import get_session
 
 router = APIRouter(tags=["Members"])
 
 
-@router.get("", response_model=List[Member])
+@router.get("", response_model=List[MemberResponse])
 def get_all_members(session: Session = Depends(get_session)):
-    return session.exec(select(Member)).all()
+    return session.scalars(select(Member)).all()
 
 
-@router.get("/get_by_status", response_model=List[Member])
+@router.get("/get_by_status", response_model=List[MemberResponse])
 def get_members_by_status(status: str, session: Session = Depends(get_session)):
-    return session.exec(select(Member).where(Member.status == status.casefold())).all()
+    return session.scalars(select(Member).where(Member.status == status.casefold())).all()
 
 
-@router.get("/{member_id}", response_model=Member)
+@router.get("/{member_id}", response_model=MemberResponse)
 def get_member_by_id(member_id: int = Path(gt=0), session: Session = Depends(get_session)):
     member = session.get(Member, member_id)
     if not member:
@@ -28,7 +29,7 @@ def get_member_by_id(member_id: int = Path(gt=0), session: Session = Depends(get
     return member
 
 
-@router.post("/create_member", response_model=Member)
+@router.post("/create_member", response_model=MemberResponse)
 def create_member(req: MemberRequest, session: Session = Depends(get_session)):
     user = session.get(User, req.user_id)
     if not user:
@@ -39,14 +40,14 @@ def create_member(req: MemberRequest, session: Session = Depends(get_session)):
         if not plan:
             raise HTTPException(status_code=400, detail=f"Membership plan {req.membership_plan_id} does not exist")
 
-    new_member = Member.model_validate(req)
+    new_member = Member(**req.model_dump(exclude={"id"}))
     session.add(new_member)
     session.commit()
     session.refresh(new_member)
     return new_member
 
 
-@router.put("/update_member", response_model=Member)
+@router.put("/update_member", response_model=MemberResponse)
 def update_member(req: MemberRequest, session: Session = Depends(get_session)):
     member = session.get(Member, req.id)
     if not member:

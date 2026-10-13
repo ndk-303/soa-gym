@@ -6,10 +6,11 @@ class BookingRequest(BaseModel):
     id: Optional[int] = Field(default=None, title="id is not needed")
     member_id: int = Field(gt=0)
     slot_id: int = Field(gt=0)
-    status: str = Field(default="confirmed", min_length=4, max_length=20)
-    waitlist_position: Optional[int] = Field(default=None, ge=1)
+    status: str = Field(default="confirmed", min_length=3, max_length=20)
+    waitlist_position: Optional[int] = Field(default=None)
 
     model_config = ConfigDict(
+        from_attributes=True,
         json_schema_extra={
             'example': {
                 'member_id': 1,
@@ -19,3 +20,6 @@ class BookingRequest(BaseModel):
             }
         }
     )
+
+
+BookingResponse = BookingRequest

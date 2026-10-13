@@ -1,24 +1,25 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Path
-from sqlmodel import Session, select
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 from app.models.attendance import AttendanceRecord
-from app.schemas.attendance import AttendanceRecordRequest
+from app.schemas.attendance import AttendanceRecordRequest, AttendanceRecordResponse
 from app.database.session import get_session
 
 router = APIRouter(tags=["Attendance"])
 
 
-@router.get("", response_model=List[AttendanceRecord])
+@router.get("", response_model=List[AttendanceRecordResponse])
 def get_all_attendance(session: Session = Depends(get_session)):
-    return session.exec(select(AttendanceRecord)).all()
+    return session.scalars(select(AttendanceRecord)).all()
 
 
-@router.get("/get_by_status", response_model=List[AttendanceRecord])
+@router.get("/get_by_status", response_model=List[AttendanceRecordResponse])
 def get_attendance_by_status(status: str, session: Session = Depends(get_session)):
-    return session.exec(select(AttendanceRecord).where(AttendanceRecord.status == status.casefold())).all()
+    return session.scalars(select(AttendanceRecord).where(AttendanceRecord.status == status.casefold())).all()
 
 
-@router.get("/{attendance_id}", response_model=AttendanceRecord)
+@router.get("/{attendance_id}", response_model=AttendanceRecordResponse)
 def get_attendance_by_id(attendance_id: int = Path(gt=0), session: Session = Depends(get_session)):
     record = session.get(AttendanceRecord, attendance_id)
     if not record:
@@ -26,17 +27,17 @@ def get_attendance_by_id(attendance_id: int = Path(gt=0), session: Session = Dep
     return record
 
 
-@router.post("/create_attendance", response_model=AttendanceRecord)
-@router.post("/create_record", response_model=AttendanceRecord)
+@router.post("/create_attendance", response_model=AttendanceRecordResponse)
+@router.post("/create_record", response_model=AttendanceRecordResponse)
 def create_attendance(req: AttendanceRecordRequest, session: Session = Depends(get_session)):
-    new_record = AttendanceRecord.model_validate(req)
+    new_record = AttendanceRecord(**req.model_dump(exclude={"id"}))
     session.add(new_record)
     session.commit()
     session.refresh(new_record)
     return new_record
 
 
-@router.put("/update_attendance", response_model=AttendanceRecord)
+@router.put("/update_attendance", response_model=AttendanceRecordResponse)
 def update_attendance(req: AttendanceRecordRequest, session: Session = Depends(get_session)):
     record = session.get(AttendanceRecord, req.id)
     if not record:

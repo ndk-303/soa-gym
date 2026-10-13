@@ -1,11 +1,15 @@
 from typing import Optional
-from sqlmodel import Field, SQLModel
+from sqlalchemy import String, Integer, Boolean, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column
+from app.models.base import Base
 
 
-class ClassSlot(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    class_id: int = Field(foreign_key="gymclass.id")
-    start_time: str
-    max_capacity: int = Field(default=20)
-    current_bookings: int = Field(default=0)
-    is_cancelled: bool = Field(default=False)
+class ClassSlot(Base):
+    __tablename__ = "classslot"
+
+    id: Mapped[Optional[int]] = mapped_column(primary_key=True, autoincrement=True, default=None)
+    class_id: Mapped[int] = mapped_column(Integer, ForeignKey("gymclass.id"))
+    start_time: Mapped[str] = mapped_column(String)
+    max_capacity: Mapped[int] = mapped_column(Integer, default=20)
+    current_bookings: Mapped[int] = mapped_column(Integer, default=0)
+    is_cancelled: Mapped[bool] = mapped_column(Boolean, default=False)

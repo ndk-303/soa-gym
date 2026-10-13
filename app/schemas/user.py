@@ -9,6 +9,7 @@ class UserRequest(BaseModel):
     password: str = Field(min_length=6, max_length=50)
 
     model_config = ConfigDict(
+        from_attributes=True,
         json_schema_extra={
             'example': {
                 'email': 'admin@gym.com',
@@ -17,3 +18,6 @@ class UserRequest(BaseModel):
             }
         }
     )
+
+
+UserResponse = UserRequest

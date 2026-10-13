@@ -1,24 +1,25 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Path
-from sqlmodel import Session, select
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 from app.models.user import User
-from app.schemas.user import UserRequest
+from app.schemas.user import UserRequest, UserResponse
 from app.database.session import get_session
 
 router = APIRouter(tags=["Users"])
 
 
-@router.get("", response_model=List[User])
+@router.get("", response_model=List[UserResponse])
 def get_all_users(session: Session = Depends(get_session)):
-    return session.exec(select(User)).all()
+    return session.scalars(select(User)).all()
 
 
-@router.get("/get_role", response_model=List[User])
+@router.get("/get_role", response_model=List[UserResponse])
 def get_users_by_role(role: str, session: Session = Depends(get_session)):
-    return session.exec(select(User).where(User.role == role.casefold())).all()
+    return session.scalars(select(User).where(User.role == role.casefold())).all()
 
 
-@router.get("/{user_id}", response_model=User)
+@router.get("/{user_id}", response_model=UserResponse)
 def get_user_by_id(user_id: int = Path(gt=0), session: Session = Depends(get_session)):
     user = session.get(User, user_id)
     if not user:
@@ -26,25 +27,25 @@ def get_user_by_id(user_id: int = Path(gt=0), session: Session = Depends(get_ses
     return user
 
 
-@router.post("/create_user", response_model=User)
+@router.post("/create_user", response_model=UserResponse)
 def create_user(req: UserRequest, session: Session = Depends(get_session)):
-    existing = session.exec(select(User).where(User.email == req.email)).first()
+    existing = session.scalars(select(User).where(User.email == req.email)).first()
     if existing:
         raise HTTPException(status_code=400, detail="User with this email already exists")
-    new_user = User.model_validate(req)
+    new_user = User(**req.model_dump(exclude={"id"}))
     session.add(new_user)
     session.commit()
     session.refresh(new_user)
     return new_user
 
 
-@router.put("/update_user", response_model=User)
+@router.put("/update_user", response_model=UserResponse)
 def update_user(req: UserRequest, session: Session = Depends(get_session)):
     user = session.get(User, req.id)
     if not user:
         raise HTTPException(status_code=404, detail=f"User with id {req.id} not found")
     if req.email != user.email:
-        existing = session.exec(select(User).where(User.email == req.email)).first()
+        existing = session.scalars(select(User).where(User.email == req.email)).first()
         if existing and existing.id != user.id:
             raise HTTPException(status_code=400, detail="User with this email already exists")
     user.email = req.email

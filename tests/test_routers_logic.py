@@ -1,6 +1,6 @@
 import pytest
 from httpx import AsyncClient
-from sqlmodel import Session
+from sqlalchemy.orm import Session
 from app.models.class_slot import ClassSlot
 from app.models.invoice import Invoice
 

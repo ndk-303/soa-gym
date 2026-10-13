@@ -1,6 +1,6 @@
-# Gym Management System — FastAPI Modular Monolith (SQLite + SQLModel)
+# Gym Management System — FastAPI Modular Monolith (SQLite + Pure SQLAlchemy 2.0)
 
-Dự án Hệ Thống Quản Lý Phòng Tập (Gym Management System) được tổ chức theo kiến trúc **Modular Monolith** bằng **FastAPI**, **SQLModel** (kết hợp SQLAlchemy 2.0 Core và Pydantic V2) và lưu trữ dữ liệu bền vững bằng **SQLite**. Toàn bộ 9 domain modules được tích hợp vào một ứng dụng duy nhất chạy trên cổng `8000`.
+Dự án Hệ Thống Quản Lý Phòng Tập (Gym Management System) được tổ chức theo kiến trúc **Modular Monolith** bằng **FastAPI**, **SQLAlchemy 2.0** (Mapped/mapped_column) và lưu trữ dữ liệu bền vững bằng **SQLite**. Toàn bộ 9 domain modules được tích hợp vào một ứng dụng duy nhất chạy trên cổng `8000`.
 
 ---
 
@@ -8,7 +8,7 @@ Dự án Hệ Thống Quản Lý Phòng Tập (Gym Management System) được t
 
 ### Cài Đặt Môi Trường
 ```bash
-pip install fastapi uvicorn pydantic sqlmodel pytest httpx
+pip install fastapi uvicorn pydantic sqlalchemy pytest httpx
 ```
 
 ### Nạp Dữ Liệu Mẫu (Tùy Chọn)
@@ -43,7 +43,8 @@ pytest tests/ -v
 ```
 gym-models/
 ├── app/
-│   ├── models/            # SQLModel Table Entities (table=True, PK, FK)
+│   ├── models/            # Pure SQLAlchemy 2.0 ORM Entities (Base, Mapped, mapped_column)
+│   │   ├── base.py        # DeclarativeBase với MappedAsDataclass
 │   │   ├── user.py
 │   │   ├── membership_plan.py
 │   │   ├── member.py
@@ -53,7 +54,7 @@ gym-models/
 │   │   ├── invoice.py
 │   │   ├── payment.py
 │   │   └── attendance.py
-│   ├── schemas/           # Pydantic V2 Request DTOs & Validation Schemas
+│   ├── schemas/           # Pydantic V2 Request & Response DTOs
 │   │   ├── user.py
 │   │   ├── membership_plan.py
 │   │   ├── member.py
@@ -66,7 +67,7 @@ gym-models/
 │   ├── database/          # SQLite Connection Engine, Session & Seeder
 │   │   ├── session.py     # engine, get_session, create_db_and_tables
 │   │   └── seed.py        # Dữ liệu mẫu & hàm seed_database
-│   ├── routers/           # FastAPI APIRouters (CRUD & Domain Logic với SQLModel)
+│   ├── routers/           # FastAPI APIRouters (CRUD & Domain Logic với SQLAlchemy)
 │   │   ├── users.py
 │   │   ├── membership_plans.py
 │   │   ├── members.py
@@ -109,7 +110,7 @@ gym-models/
 
 ---
 
-## ⚡ Nghiệp Vụ Tích Hợp với SQLModel & SQLite
+## ⚡ Nghiệp Vụ Tích Hợp với SQLAlchemy & SQLite
 
 1. **Session Lifecycle:** Mọi router endpoint đều inject `session: Session = Depends(get_session)` với cơ chế quản lý giao dịch an toàn.
 2. **Member Validation:** Khi tạo Member (`POST /members/create_member`), router kiểm tra sự tồn tại của `user_id` và `membership_plan_id` trong SQLite qua `session.get()`, trả về 400 nếu không hợp lệ.

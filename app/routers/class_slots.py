@@ -1,24 +1,25 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Path
-from sqlmodel import Session, select
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 from app.models.class_slot import ClassSlot
-from app.schemas.class_slot import ClassSlotRequest
+from app.schemas.class_slot import ClassSlotRequest, ClassSlotResponse
 from app.database.session import get_session
 
 router = APIRouter(tags=["Class Slots"])
 
 
-@router.get("", response_model=List[ClassSlot])
+@router.get("", response_model=List[ClassSlotResponse])
 def get_all_slots(session: Session = Depends(get_session)):
-    return session.exec(select(ClassSlot)).all()
+    return session.scalars(select(ClassSlot)).all()
 
 
-@router.get("/get_by_class", response_model=List[ClassSlot])
+@router.get("/get_by_class", response_model=List[ClassSlotResponse])
 def get_slots_by_class(class_id: int, session: Session = Depends(get_session)):
-    return session.exec(select(ClassSlot).where(ClassSlot.class_id == class_id)).all()
+    return session.scalars(select(ClassSlot).where(ClassSlot.class_id == class_id)).all()
 
 
-@router.get("/{slot_id}", response_model=ClassSlot)
+@router.get("/{slot_id}", response_model=ClassSlotResponse)
 def get_slot_by_id(slot_id: int = Path(gt=0), session: Session = Depends(get_session)):
     slot = session.get(ClassSlot, slot_id)
     if not slot:
@@ -26,16 +27,16 @@ def get_slot_by_id(slot_id: int = Path(gt=0), session: Session = Depends(get_ses
     return slot
 
 
-@router.post("/create_slot", response_model=ClassSlot)
+@router.post("/create_slot", response_model=ClassSlotResponse)
 def create_slot(req: ClassSlotRequest, session: Session = Depends(get_session)):
-    new_slot = ClassSlot.model_validate(req)
+    new_slot = ClassSlot(**req.model_dump(exclude={"id"}))
     session.add(new_slot)
     session.commit()
     session.refresh(new_slot)
     return new_slot
 
 
-@router.put("/update_slot", response_model=ClassSlot)
+@router.put("/update_slot", response_model=ClassSlotResponse)
 def update_slot(req: ClassSlotRequest, session: Session = Depends(get_session)):
     slot = session.get(ClassSlot, req.id)
     if not slot:

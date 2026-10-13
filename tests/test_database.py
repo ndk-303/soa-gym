@@ -1,6 +1,8 @@
 import pytest
-from sqlmodel import SQLModel, create_engine, Session, select
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
+from app.models.base import Base
 from app.database.session import create_db_and_tables, get_session, engine
 from app.database.seed import seed_database
 from app.models.user import User
@@ -20,41 +22,41 @@ def test_session_and_seed_database():
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    SQLModel.metadata.create_all(test_engine)
+    Base.metadata.create_all(test_engine)
     with Session(test_engine) as session:
         seed_database(session)
 
-        users = session.exec(select(User)).all()
+        users = session.scalars(select(User)).all()
         assert len(users) == 6
         assert session.get(User, 1).email == "admin@gym.com"
 
-        plans = session.exec(select(MembershipPlan)).all()
+        plans = session.scalars(select(MembershipPlan)).all()
         assert len(plans) == 4
 
-        members = session.exec(select(Member)).all()
+        members = session.scalars(select(Member)).all()
         assert len(members) == 3
 
-        classes = session.exec(select(GymClass)).all()
+        classes = session.scalars(select(GymClass)).all()
         assert len(classes) == 4
 
-        slots = session.exec(select(ClassSlot)).all()
+        slots = session.scalars(select(ClassSlot)).all()
         assert len(slots) == 4
 
-        bookings = session.exec(select(Booking)).all()
+        bookings = session.scalars(select(Booking)).all()
         assert len(bookings) == 4
 
-        invoices = session.exec(select(Invoice)).all()
+        invoices = session.scalars(select(Invoice)).all()
         assert len(invoices) == 4
 
-        payments = session.exec(select(Payment)).all()
+        payments = session.scalars(select(Payment)).all()
         assert len(payments) == 3
 
-        records = session.exec(select(AttendanceRecord)).all()
+        records = session.scalars(select(AttendanceRecord)).all()
         assert len(records) == 3
 
         # Second seeding should be idempotent (no duplicates added)
         seed_database(session)
-        assert len(session.exec(select(User)).all()) == 6
+        assert len(session.scalars(select(User)).all()) == 6
 
 
 def test_get_session_yield():

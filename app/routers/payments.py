@@ -1,25 +1,26 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Path
-from sqlmodel import Session, select
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 from app.models.payment import Payment
 from app.models.invoice import Invoice
-from app.schemas.payment import PaymentRequest
+from app.schemas.payment import PaymentRequest, PaymentResponse
 from app.database.session import get_session
 
 router = APIRouter(tags=["Payments"])
 
 
-@router.get("", response_model=List[Payment])
+@router.get("", response_model=List[PaymentResponse])
 def get_all_payments(session: Session = Depends(get_session)):
-    return session.exec(select(Payment)).all()
+    return session.scalars(select(Payment)).all()
 
 
-@router.get("/get_by_method", response_model=List[Payment])
+@router.get("/get_by_method", response_model=List[PaymentResponse])
 def get_payments_by_method(method: str, session: Session = Depends(get_session)):
-    return session.exec(select(Payment).where(Payment.payment_method == method.casefold())).all()
+    return session.scalars(select(Payment)).where(Payment.payment_method == method.casefold()).all()
 
 
-@router.get("/{payment_id}", response_model=Payment)
+@router.get("/{payment_id}", response_model=PaymentResponse)
 def get_payment_by_id(payment_id: int = Path(gt=0), session: Session = Depends(get_session)):
     payment = session.get(Payment, payment_id)
     if not payment:
@@ -27,7 +28,7 @@ def get_payment_by_id(payment_id: int = Path(gt=0), session: Session = Depends(g
     return payment
 
 
-@router.post("/create_payment", response_model=Payment)
+@router.post("/create_payment", response_model=PaymentResponse)
 def create_payment(req: PaymentRequest, session: Session = Depends(get_session)):
     invoice = session.get(Invoice, req.invoice_id)
     if not invoice:
@@ -36,7 +37,7 @@ def create_payment(req: PaymentRequest, session: Session = Depends(get_session))
     if invoice.status.casefold() == "paid":
         raise HTTPException(status_code=400, detail="Invoice is already fully paid")
 
-    new_payment = Payment.model_validate(req)
+    new_payment = Payment(**req.model_dump(exclude={"id"}))
     session.add(new_payment)
 
     invoice.amount_paid += req.amount
@@ -51,7 +52,7 @@ def create_payment(req: PaymentRequest, session: Session = Depends(get_session))
     return new_payment
 
 
-@router.put("/update_payment", response_model=Payment)
+@router.put("/update_payment", response_model=PaymentResponse)
 def update_payment(req: PaymentRequest, session: Session = Depends(get_session)):
     payment = session.get(Payment, req.id)
     if not payment:
