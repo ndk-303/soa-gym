@@ -36,6 +36,7 @@ def create_booking(req: BookingRequest, session: Session = Depends(get_session))
         raise HTTPException(status_code=400, detail="Member is not active or does not exist")
 
     slot = session.get(ClassSlot, req.slot_id)
+    
     if not slot:
         raise HTTPException(status_code=404, detail=f"Class slot with id {req.slot_id} not found")
 
