@@ -12,13 +12,15 @@ export default function Dashboard({ onTabChange }) {
     attendanceCount: 0,
     loading: true,
     error: null,
+    failedResources: 0,
+    loadedAt: null,
   })
 
   useEffect(() => {
     loadOverview()
   }, [])
 
-  const loadOverview = async () => {
+  async function loadOverview() {
     setStats((prev) => ({ ...prev, loading: true, error: null }))
     try {
       const [users, members, plans, classes, bookings, invoices, attendance] = await Promise.allSettled([
@@ -31,6 +33,9 @@ export default function Dashboard({ onTabChange }) {
         attendanceApi.getAll(),
       ])
 
+      const failedResources = [users, members, plans, classes, bookings, invoices, attendance]
+        .filter((result) => result.status === 'rejected').length
+
       setStats({
         usersCount: users.status === 'fulfilled' ? users.value.data.length : 0,
         membersCount: members.status === 'fulfilled' ? members.value.data.length : 0,
@@ -40,64 +45,67 @@ export default function Dashboard({ onTabChange }) {
         invoicesCount: invoices.status === 'fulfilled' ? invoices.value.data.length : 0,
         attendanceCount: attendance.status === 'fulfilled' ? attendance.value.data.length : 0,
         loading: false,
-        error: null,
+        error: failedResources > 0 ? `Không thể tải ${failedResources} nguồn dữ liệu` : null,
+        failedResources,
+        loadedAt: new Date(),
       })
-    } catch (err) {
+    } catch {
       setStats((prev) => ({ ...prev, loading: false, error: 'Không thể kết nối tới Backend' }))
     }
   }
 
   const statCards = [
-    { title: 'Tài khoản', count: stats.usersCount, icon: 'bi-people', color: 'primary', tab: 'users' },
-    { title: 'Hội viên', count: stats.membersCount, icon: 'bi-person-badge', color: 'success', tab: 'members' },
-    { title: 'Gói tập', count: stats.plansCount, icon: 'bi-card-checklist', color: 'info', tab: 'plans' },
-    { title: 'Lớp học', count: stats.classesCount, icon: 'bi-calendar-event', color: 'warning', tab: 'classes' },
-    { title: 'Đặt chỗ', count: stats.bookingsCount, icon: 'bi-bookmark-check', color: 'danger', tab: 'bookings' },
-    { title: 'Điểm danh', count: stats.attendanceCount, icon: 'bi-qr-code-scan', color: 'secondary', tab: 'attendance' },
-    { title: 'Hóa đơn', count: stats.invoicesCount, icon: 'bi-receipt', color: 'dark', tab: 'invoices' },
+    { title: 'Tài khoản', count: stats.usersCount, icon: 'bi-person', tab: 'users', group: 'Hội viên' },
+    { title: 'Hội viên', count: stats.membersCount, icon: 'bi-people', tab: 'members', group: 'Hội viên' },
+    { title: 'Gói tập', count: stats.plansCount, icon: 'bi-card-list', tab: 'plans', group: 'Hội viên' },
+    { title: 'Lớp học', count: stats.classesCount, icon: 'bi-calendar-event', tab: 'classes', group: 'Vận hành' },
+    { title: 'Đặt chỗ', count: stats.bookingsCount, icon: 'bi-bookmark-check', tab: 'bookings', group: 'Vận hành' },
+    { title: 'Điểm danh', count: stats.attendanceCount, icon: 'bi-qr-code-scan', tab: 'attendance', group: 'Vận hành' },
+    { title: 'Hóa đơn', count: stats.invoicesCount, icon: 'bi-receipt', tab: 'invoices', group: 'Tài chính' },
   ]
 
+  const formatNumber = (value) => new Intl.NumberFormat('vi-VN').format(value)
   return (
-    <div>
-      <div className="d-flex justify-content-between align-items-center mb-4">
+    <div className="dashboard-page">
+      <div className="dashboard-header">
         <div>
-          <h2 className="fw-bold mb-0">Tổng quan Hệ thống Gym</h2>
+          <div className="breadcrumb-label"><i className="bi bi-grid-1x2 me-2"></i>Dashboard</div>
+          <h1>Tổng quan hệ thống</h1>
+          <p>Theo dõi nhanh tình hình hoạt động của SOA Gym Center</p>
         </div>
-        <button className="btn btn-outline-primary d-flex align-items-center gap-2" onClick={loadOverview}>
-          <i className="bi bi-arrow-clockwise"></i> Làm mới
+        <button className="refresh-button" onClick={loadOverview} disabled={stats.loading}>
+          <i className={`bi ${stats.loading ? 'bi-arrow-repeat spin' : 'bi-arrow-clockwise'}`}></i>
+          Làm mới
         </button>
       </div>
 
       {stats.error && (
-        <div className="alert alert-warning d-flex align-items-center gap-2 shadow-sm" role="alert">
-          <i className="bi bi-exclamation-triangle-fill fs-5"></i>
-          <div>{stats.error}.</div>
+        <div className="dashboard-alert" role="alert">
+          <i className="bi bi-exclamation-triangle"></i>
+          <div>{stats.error}. Vui lòng kiểm tra kết nối backend.</div>
         </div>
       )}
 
-      <div className="row g-3">
+      <div className="kpi-grid">
         {statCards.map((c) => (
-          <div key={c.tab} className="col-12 col-sm-6 col-lg-3">
-            <div 
-              className={`card border-0 shadow-sm h-100 bg-white border-top border-4 border-${c.color}`}
-              style={{ cursor: 'pointer', transition: 'transform 0.15s ease' }}
-              onClick={() => onTabChange(c.tab)}
-            >
-              <div className="card-body d-flex align-items-center justify-content-between">
-                <div>
-                  <div className="text-muted small fw-medium text-uppercase">{c.title}</div>
-                  <div className="fs-3 fw-bold text-dark mt-1">
-                    {stats.loading ? '...' : c.count}
-                  </div>
-                </div>
-                <div className={`p-3 rounded-circle bg-${c.color}-subtle text-${c.color}`}>
-                  <i className={`bi ${c.icon} fs-4`}></i>
-                </div>
-              </div>
+          <button
+            type="button"
+            key={c.tab}
+            className="kpi-card"
+            onClick={() => onTabChange(c.tab)}
+          >
+            <div className="kpi-card-top">
+              <span className="kpi-icon"><i className={`bi ${c.icon}`}></i></span>
+              <i className="bi bi-arrow-up-right kpi-arrow"></i>
             </div>
-          </div>
+            <div className="kpi-card-value">
+              {stats.loading ? <span className="kpi-skeleton"></span> : formatNumber(c.count)}
+            </div>
+            <div className="kpi-card-label">{c.title}</div>
+          </button>
         ))}
       </div>
+
     </div>
   )
 }

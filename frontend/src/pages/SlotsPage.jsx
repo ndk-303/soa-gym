@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { slotsApi, classesApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
-import LoadingSpinner from '../components/LoadingSpinner'
+import { ActionMenu, ManagementHeader, ManagementTable } from '../components/ManagementUI'
+import { formatSchedule } from '../components/managementUtils'
 
 export default function SlotsPage() {
   const [slots, setSlots] = useState([])
@@ -25,7 +26,7 @@ export default function SlotsPage() {
     fetchData()
   }, [])
 
-  const fetchData = async () => {
+  async function fetchData() {
     setLoading(true)
     setError(null)
     try {
@@ -114,93 +115,51 @@ export default function SlotsPage() {
 
   return (
     <div>
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <div>
-          <h3 className="fw-bold mb-1">
-            <i className="bi bi-clock-history text-secondary me-2"></i>
-            Quản lý Ca tập (Class Slots)
-          </h3>
-          <p className="text-muted small mb-0">Thời gian biểu các ca học, số lượng chỗ tối đa và số chỗ đã đặt</p>
-        </div>
-        <div className="d-flex gap-2">
-          <button className="btn btn-outline-secondary btn-sm" onClick={fetchData}>
-            <i className="bi bi-arrow-clockwise me-1"></i> Làm mới
-          </button>
-          <button className="btn btn-primary btn-sm" onClick={handleOpenAdd}>
-            <i className="bi bi-plus-lg me-1"></i> Thêm Ca tập
-          </button>
-        </div>
-      </div>
+      <ManagementHeader title="Ca tập" description="Lịch tập, sức chứa và số chỗ đã đăng ký theo từng lớp" onRefresh={fetchData} onAdd={handleOpenAdd} addLabel="Thêm ca tập" />
 
       {error && (
-        <div className="alert alert-danger py-2 small" role="alert">
+        <div className="management-error" role="alert">
           <i className="bi bi-exclamation-circle me-2"></i> {error}
         </div>
       )}
 
-      <div className="card border-0 shadow-sm">
-        <div className="table-responsive">
-          {loading ? (
-            <LoadingSpinner message="Đang tải dữ liệu Ca tập..." />
-          ) : slots.length === 0 ? (
-            <div className="text-center py-5 text-muted">
-              <i className="bi bi-inbox fs-1 d-block mb-2 text-secondary"></i>
-              Chưa có dữ liệu ca tập nào
-            </div>
-          ) : (
-            <table className="table table-hover align-middle mb-0">
-              <thead className="table-light">
-                <tr>
-                  <th style={{ width: '60px' }}>ID</th>
-                  <th>Lớp học</th>
-                  <th>Thời gian bắt đầu</th>
-                  <th>Đã đặt / Tối đa</th>
-                  <th>Trạng thái</th>
-                  <th style={{ width: '140px' }} className="text-end">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
+      <ManagementTable
+        columns={[
+          { key: 'class', label: 'Lớp học', width: '28%' },
+          { key: 'start', label: 'Thời gian bắt đầu', width: '18%' },
+          { key: 'capacity', label: 'Sức chứa', width: '19%' },
+          { key: 'status', label: 'Trạng thái', width: '15%' },
+          { key: 'actions', label: 'Hành động', width: '190px', align: 'center' },
+        ]}
+        loading={loading}
+        loadingMessage="Đang tải dữ liệu Ca tập..."
+        isEmpty={slots.length === 0}
+        emptyMessage="Chưa có dữ liệu ca tập nào"
+      >
                 {slots.map((s) => {
                   const linkedClass = classMap[s.class_id]
                   return (
                     <tr key={s.id}>
-                      <td className="fw-bold text-secondary">#{s.id}</td>
                       <td>
-                        <span className="badge bg-warning-subtle text-warning-emphasis border">
-                          <i className="bi bi-calendar-event me-1"></i>
-                          {linkedClass ? `${linkedClass.name} (${linkedClass.category})` : `Lớp #${s.class_id}`}
-                        </span>
+                        <div className="primary-cell">{linkedClass ? linkedClass.name : `Lớp #${s.class_id}`}</div>
+                        <div className="secondary-cell">Ca tập #{s.id}{linkedClass?.category ? ` · ${linkedClass.category}` : ''}</div>
                       </td>
-                      <td className="fw-medium">{s.start_time}</td>
+                      <td>{(() => { const schedule = formatSchedule(s.start_time); return <><div className="schedule-date">{schedule.date}</div><div className="schedule-time">{schedule.time}</div></> })()}</td>
                       <td>
-                        <span className="fw-bold text-primary">{s.current_bookings}</span> / {s.max_capacity}
-                        <div className="progress mt-1" style={{ height: '6px' }}>
-                          <div 
-                            className="progress-bar bg-primary" 
-                            role="progressbar" 
-                            style={{ width: `${Math.min(100, (s.current_bookings / (s.max_capacity || 1)) * 100)}%` }}
-                          ></div>
+                        <div className="capacity-label"><span><strong>{s.current_bookings}</strong> / {s.max_capacity} chỗ</span></div>
+                        <div className="capacity-bar"><span style={{ width: `${Math.min(100, (s.current_bookings / (s.max_capacity || 1)) * 100)}%` }}></span>
                         </div>
                       </td>
                       <td>
                         <StatusBadge status={s.is_cancelled ? 'cancelled' : 'active'} />
                       </td>
                       <td className="text-end">
-                        <button className="btn btn-sm btn-outline-primary me-1" onClick={() => handleOpenEdit(s)}>
-                          <i className="bi bi-pencil"></i>
-                        </button>
-                        <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(s.id)}>
-                          <i className="bi bi-trash"></i>
-                        </button>
+                        <ActionMenu onEdit={() => handleOpenEdit(s)} onDelete={() => handleDelete(s.id)} />
                       </td>
                     </tr>
                   )
                 })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+      </ManagementTable>
 
       {showModal && (
         <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>

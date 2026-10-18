@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1280" role="img" aria-labelledby="title desc">
+  <title id="title">SOA Gym Center</title>
+  <desc id="desc">Biểu tượng quả tạ màu xanh</desc>
+  <defs>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="0.8">
+      <stop offset="0" stop-color="#0758f2"/>
+      <stop offset="1" stop-color="#08b8ee"/>
+    </linearGradient>
+    <linearGradient id="blueSide" x1="0" y1="0" x2="1" y2="0.8">
+      <stop offset="0" stop-color="#1148e9"/>
+      <stop offset="1" stop-color="#0a8ce9"/>
+    </linearGradient>
+    <linearGradient id="dark" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#142c4d"/>
+      <stop offset="1" stop-color="#0b1c35"/>
+    </linearGradient>
+  </defs>
+
+  <path d="M369 407c70-80 166-123 271-123s201 43 271 123l-65 58c-54-58-124-91-206-91s-152 33-206 91z" fill="url(#blue)"/>
+  <path d="M369 826c70 80 166 123 271 123s201-43 271-123l-65-58c-54 58-124 91-206 91s-152-33-206-91z" fill="url(#blue)"/>
+  <rect x="408" y="585" width="438" height="82" rx="13" fill="url(#dark)"/>
+
+  <rect x="280" y="426" width="124" height="389" rx="59" fill="url(#blue)"/>
+  <rect x="183" y="497" width="94" height="263" rx="45" fill="url(#blueSide)"/>
+  <rect x="110" y="570" width="66" height="116" rx="31" fill="url(#dark)"/>
+  <rect x="846" y="426" width="124" height="389" rx="59" fill="url(#blue)"/>
+  <rect x="976" y="497" width="94" height="263" rx="45" fill="url(#blueSide)"/>
+  <rect x="1104" y="570" width="66" height="116" rx="31" fill="url(#dark)"/>
+</svg>
