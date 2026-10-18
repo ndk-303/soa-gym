@@ -1,0 +1,7 @@
+.table-hover tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+.card {
+  border-radius: 0.5rem;
+}
