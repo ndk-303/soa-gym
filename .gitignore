@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.db
+.pytest_cache/
+venv/
+.env
+
+# Superpowers temporary workspace
+.superpowers/
+
+# Node
+node_modules/

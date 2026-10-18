@@ -1,7 +1,9 @@
 import sys
 import os
+import asyncio
 import httpx
 from typing import Optional, Tuple
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -20,10 +22,24 @@ from config import (
     ATTENDANCE_SERVICE_URL,
 )
 
+# Shared persistent HTTP client pool
+http_client: Optional[httpx.AsyncClient] = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global http_client
+    http_client = httpx.AsyncClient(timeout=10.0)
+    yield
+    if http_client:
+        await http_client.aclose()
+
+
 app = FastAPI(
     title="Gym Management API Gateway (SOA)",
     description="Unified Entry Point for Gym Management Microservices",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -86,17 +102,25 @@ async def health_check():
         "billing-service": f"{BILLING_SERVICE_URL}/health",
         "attendance-service": f"{ATTENDANCE_SERVICE_URL}/health",
     }
-    results = {}
-    async with httpx.AsyncClient(timeout=2.0) as client:
-        for name, url in services_to_check.items():
-            try:
-                r = await client.get(url)
-                if r.status_code == 200:
-                    results[name] = "UP"
-                else:
-                    results[name] = f"DOWN (status: {r.status_code})"
-            except Exception:
-                results[name] = "DOWN (connection failed)"
+
+    client = http_client if http_client is not None else httpx.AsyncClient(timeout=2.0)
+    should_close = http_client is None
+
+    async def check_single(name: str, url: str):
+        try:
+            r = await client.get(url, timeout=2.0)
+            if r.status_code == 200:
+                return name, "UP"
+            return name, f"DOWN (status: {r.status_code})"
+        except Exception:
+            return name, "DOWN (connection failed)"
+
+    try:
+        tasks = [check_single(name, url) for name, url in services_to_check.items()]
+        results = dict(await asyncio.gather(*tasks))
+    finally:
+        if should_close:
+            await client.aclose()
 
     return {
         "status": "UP",
@@ -118,22 +142,22 @@ async def reverse_proxy(full_path: str, request: Request):
     base_url, target_path = match
     target_url = f"{base_url}{target_path}"
 
-    # Extract headers (filtering out host header)
     headers = {k: v for k, v in request.headers.items() if k.lower() not in ("host", "content-length")}
     params = dict(request.query_params)
     body = await request.body()
 
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.request(
-                method=request.method,
-                url=target_url,
-                headers=headers,
-                params=params,
-                content=body,
-            )
+    client = http_client if http_client is not None else httpx.AsyncClient(timeout=10.0)
+    should_close = http_client is None
 
-        # Return downstream response
+    try:
+        resp = await client.request(
+            method=request.method,
+            url=target_url,
+            headers=headers,
+            params=params,
+            content=body,
+        )
+
         filtered_headers = {
             k: v for k, v in resp.headers.items()
             if k.lower() not in ("content-length", "content-encoding", "transfer-encoding")
@@ -156,6 +180,9 @@ async def reverse_proxy(full_path: str, request: Request):
             status_code=status.HTTP_502_BAD_GATEWAY,
             content={"detail": f"Gateway proxy error: {str(exc)}"},
         )
+    finally:
+        if should_close:
+            await client.aclose()
 
 
 if __name__ == "__main__":
