@@ -16,9 +16,6 @@ export default function Navbar({ onMenuToggle }) {
       </div>
 
       <div className="app-navbar-meta">
-        <span className="status-dot"></span>
-        <span className="d-none d-sm-inline text-muted small">Hệ thống phân tán</span>
-        <span className="navbar-divider"></span>
 
         <span
           className="admin-avatar"
