@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
+import { useAuth } from '../context/AuthContext'
 import { classesApi, usersApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
 import { ActionMenu, ManagementHeader, ManagementTable } from '../components/ManagementUI'
 
 export default function ClassesPage() {
+  const { isAdmin } = useAuth()
   const [classes, setClasses] = useState([])
+
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -112,7 +115,13 @@ export default function ClassesPage() {
 
   return (
     <div>
-      <ManagementHeader title="Lớp học" description="Quản lý bộ môn, huấn luyện viên và trạng thái lớp học" onRefresh={fetchData} onAdd={handleOpenAdd} addLabel="Thêm lớp học" />
+      <ManagementHeader
+        title="Lớp học"
+        description="Quản lý bộ môn, huấn luyện viên và trạng thái lớp học"
+        onRefresh={fetchData}
+        onAdd={isAdmin ? handleOpenAdd : undefined}
+        addLabel="Thêm lớp học"
+      />
 
       {error && (
         <div className="management-error" role="alert">
@@ -122,36 +131,39 @@ export default function ClassesPage() {
 
       <ManagementTable
         columns={[
-          { key: 'name', label: 'Tên lớp', width: '28%' },
-          { key: 'category', label: 'Bộ môn', width: '18%' },
-          { key: 'trainer', label: 'Huấn luyện viên', width: '19%' },
-          { key: 'status', label: 'Trạng thái', width: '15%' },
-          { key: 'actions', label: 'Hành động', width: '190px', align: 'center' },
+          { key: 'name', label: 'Tên lớp', width: isAdmin ? '28%' : '35%' },
+          { key: 'category', label: 'Bộ môn', width: isAdmin ? '18%' : '25%' },
+          { key: 'trainer', label: 'Huấn luyện viên', width: isAdmin ? '19%' : '25%' },
+          { key: 'status', label: 'Trạng thái', width: isAdmin ? '15%' : '15%' },
+          ...(isAdmin ? [{ key: 'actions', label: 'Hành động', width: '190px', align: 'center' }] : []),
         ]}
         loading={loading}
         loadingMessage="Đang tải dữ liệu Lớp học..."
         isEmpty={classes.length === 0}
         emptyMessage="Chưa có dữ liệu lớp học nào"
       >
-                {classes.map((c) => {
-                  const trainer = c.trainer || userMap[c.trainer_id]
-                  return (
-                    <tr key={c.id}>
-                      <td><div className="primary-cell">{c.name}</div><div className="secondary-cell">Lớp #{c.id}</div></td>
-                      <td><span className="semantic-badge">{c.category}</span></td>
-                      <td>
-                        <span className="linked-value"><i className="bi bi-person-workspace"></i>{trainer ? trainer.email : `Huấn luyện viên #${c.trainer_id}`}</span>
-                      </td>
-                      <td>
-                        <StatusBadge status={c.is_active ? 'active' : 'inactive'} />
-                      </td>
-                      <td className="text-end">
-                        <ActionMenu onEdit={() => handleOpenEdit(c)} onDelete={() => handleDelete(c.id)} />
-                      </td>
-                    </tr>
-                  )
-                })}
+        {classes.map((c) => {
+          const trainer = c.trainer || userMap[c.trainer_id]
+          return (
+            <tr key={c.id}>
+              <td><div className="primary-cell">{c.name}</div><div className="secondary-cell">Lớp #{c.id}</div></td>
+              <td><span className="semantic-badge">{c.category}</span></td>
+              <td>
+                <span className="linked-value"><i className="bi bi-person-workspace"></i>{trainer ? trainer.email : `Huấn luyện viên #${c.trainer_id}`}</span>
+              </td>
+              <td>
+                <StatusBadge status={c.is_active ? 'active' : 'inactive'} />
+              </td>
+              {isAdmin && (
+                <td className="text-end">
+                  <ActionMenu onEdit={() => handleOpenEdit(c)} onDelete={() => handleDelete(c.id)} />
+                </td>
+              )}
+            </tr>
+          )
+        })}
       </ManagementTable>
+
 
       {showModal && (
         <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>

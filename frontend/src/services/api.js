@@ -9,6 +9,20 @@ const apiClient = axios.create({
   },
 })
 
+// Attach JWT token to all requests if available
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('gym_token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+export const authApi = {
+  login: (credentials) => apiClient.post('/api/users/login', credentials),
+}
+
+
 export const usersApi = {
   getAll: () => apiClient.get('/users'),
   getById: (id) => apiClient.get(`/users/${id}`),

@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
+import { useAuth } from '../context/AuthContext'
 import { attendanceApi, membersApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
 import { ActionMenu, ManagementHeader, ManagementTable } from '../components/ManagementUI'
 import { formatDateTime } from '../components/managementUtils'
 
 export default function AttendancePage() {
+  const { isAdmin } = useAuth()
   const [records, setRecords] = useState([])
+
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -116,7 +119,13 @@ export default function AttendancePage() {
 
   return (
     <div>
-      <ManagementHeader title="Điểm danh" description="Theo dõi lượt check-in và check-out của hội viên tại phòng tập" onRefresh={fetchData} onAdd={handleOpenAdd} addLabel="Ghi nhận check-in" />
+      <ManagementHeader
+        title="Điểm danh"
+        description="Theo dõi lượt check-in và check-out của hội viên tại phòng tập"
+        onRefresh={fetchData}
+        onAdd={isAdmin ? handleOpenAdd : undefined}
+        addLabel="Ghi nhận check-in"
+      />
 
       {error && (
         <div className="management-error" role="alert">
@@ -126,12 +135,12 @@ export default function AttendancePage() {
 
       <ManagementTable
         columns={[
-          { key: 'member', label: 'Hội viên', width: '21%' },
-          { key: 'checkIn', label: 'Giờ check-in', width: '21%' },
-          { key: 'checkOut', label: 'Giờ check-out', width: '15%' },
-          { key: 'notes', label: 'Ghi chú', width: '15%' },
-          { key: 'status', label: 'Trạng thái', width: '13%' },
-          { key: 'actions', label: 'Hành động', width: '190px', align: 'center' },
+          { key: 'member', label: 'Hội viên', width: isAdmin ? '21%' : '26%' },
+          { key: 'checkIn', label: 'Giờ check-in', width: isAdmin ? '21%' : '26%' },
+          { key: 'checkOut', label: 'Giờ check-out', width: isAdmin ? '15%' : '18%' },
+          { key: 'notes', label: 'Ghi chú', width: isAdmin ? '15%' : '16%' },
+          { key: 'status', label: 'Trạng thái', width: isAdmin ? '13%' : '14%' },
+          ...(isAdmin ? [{ key: 'actions', label: 'Hành động', width: '190px', align: 'center' }] : []),
         ]}
         loading={loading}
         loadingMessage="Đang tải dữ liệu Điểm danh..."
@@ -139,27 +148,30 @@ export default function AttendancePage() {
         emptyMessage="Chưa có dữ liệu điểm danh nào"
         minWidth={900}
       >
-                {records.map((r) => {
-                  const member = r.member || memberMap[r.member_id]
-                  return (
-                    <tr key={r.id}>
-                      <td>
-                        <div className="primary-cell">{member ? member.full_name : `Hội viên #${r.member_id}`}</div>
-                        <div className="secondary-cell">Bản ghi #{r.id}{member?.email ? ` · ${member.email}` : ''}</div>
-                      </td>
-                      <td className="text-nowrap">{formatDateTime(r.check_in_time)}</td>
-                      <td className="text-nowrap">{r.check_out_time ? formatDateTime(r.check_out_time) : <span className="table-note">—</span>}</td>
-                      <td>{r.notes || <span className="table-note">—</span>}</td>
-                      <td>
-                        <StatusBadge status={r.status} />
-                      </td>
-                      <td className="text-end">
-                        <ActionMenu onEdit={() => handleOpenEdit(r)} onDelete={() => handleDelete(r.id)} />
-                      </td>
-                    </tr>
-                  )
-                })}
+        {records.map((r) => {
+          const member = r.member || memberMap[r.member_id]
+          return (
+            <tr key={r.id}>
+              <td>
+                <div className="primary-cell">{member ? member.full_name : `Hội viên #${r.member_id}`}</div>
+                <div className="secondary-cell">Bản ghi #{r.id}{member?.email ? ` · ${member.email}` : ''}</div>
+              </td>
+              <td className="text-nowrap">{formatDateTime(r.check_in_time)}</td>
+              <td className="text-nowrap">{r.check_out_time ? formatDateTime(r.check_out_time) : <span className="table-note">—</span>}</td>
+              <td>{r.notes || <span className="table-note">—</span>}</td>
+              <td>
+                <StatusBadge status={r.status} />
+              </td>
+              {isAdmin && (
+                <td className="text-end">
+                  <ActionMenu onEdit={() => handleOpenEdit(r)} onDelete={() => handleDelete(r.id)} />
+                </td>
+              )}
+            </tr>
+          )
+        })}
       </ManagementTable>
+
 
       {showModal && (
         <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>

@@ -60,3 +60,32 @@ def test_user_crud_flow(client):
     # 5. Verify deleted
     get_after_del = client.get(f"/users/{user_id}")
     assert get_after_del.status_code == 404
+
+def test_user_login_success(client):
+    # Admin login
+    admin_res = client.post("/users/login", json={"email": "admin@gym.com", "password": "password123"})
+    assert admin_res.status_code == 200
+    data = admin_res.json()
+    assert "access_token" in data
+    assert data["token_type"] == "bearer"
+    assert data["user"]["email"] == "admin@gym.com"
+    assert data["user"]["role"] == "admin"
+
+    # Member login
+    member_res = client.post("/users/login", json={"email": "member.an@gym.com", "password": "password123"})
+    assert member_res.status_code == 200
+    m_data = member_res.json()
+    assert "access_token" in m_data
+    assert m_data["user"]["email"] == "member.an@gym.com"
+    assert m_data["user"]["role"] == "member"
+
+def test_user_login_invalid_credentials(client):
+    # Wrong password
+    res1 = client.post("/users/login", json={"email": "admin@gym.com", "password": "wrongpassword"})
+    assert res1.status_code == 401
+    assert "detail" in res1.json()
+
+    # Non-existent email
+    res2 = client.post("/users/login", json={"email": "nonexistent@gym.com", "password": "password123"})
+    assert res2.status_code == 401
+

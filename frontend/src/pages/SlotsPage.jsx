@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
+import { useAuth } from '../context/AuthContext'
 import { slotsApi, classesApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
 import { ActionMenu, ManagementHeader, ManagementTable } from '../components/ManagementUI'
 import { formatSchedule } from '../components/managementUtils'
 
 export default function SlotsPage() {
+  const { isAdmin } = useAuth()
   const [slots, setSlots] = useState([])
+
   const [classes, setClasses] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -115,7 +118,13 @@ export default function SlotsPage() {
 
   return (
     <div>
-      <ManagementHeader title="Ca tập" description="Lịch tập, sức chứa và số chỗ đã đăng ký theo từng lớp" onRefresh={fetchData} onAdd={handleOpenAdd} addLabel="Thêm ca tập" />
+      <ManagementHeader
+        title="Ca tập"
+        description="Lịch tập, sức chứa và số chỗ đã đăng ký theo từng lớp"
+        onRefresh={fetchData}
+        onAdd={isAdmin ? handleOpenAdd : undefined}
+        addLabel="Thêm ca tập"
+      />
 
       {error && (
         <div className="management-error" role="alert">
@@ -125,41 +134,44 @@ export default function SlotsPage() {
 
       <ManagementTable
         columns={[
-          { key: 'class', label: 'Lớp học', width: '28%' },
-          { key: 'start', label: 'Thời gian bắt đầu', width: '18%' },
-          { key: 'capacity', label: 'Sức chứa', width: '19%' },
-          { key: 'status', label: 'Trạng thái', width: '15%' },
-          { key: 'actions', label: 'Hành động', width: '190px', align: 'center' },
+          { key: 'class', label: 'Lớp học', width: isAdmin ? '28%' : '35%' },
+          { key: 'start', label: 'Thời gian bắt đầu', width: isAdmin ? '18%' : '25%' },
+          { key: 'capacity', label: 'Sức chứa', width: isAdmin ? '19%' : '25%' },
+          { key: 'status', label: 'Trạng thái', width: isAdmin ? '15%' : '15%' },
+          ...(isAdmin ? [{ key: 'actions', label: 'Hành động', width: '190px', align: 'center' }] : []),
         ]}
         loading={loading}
         loadingMessage="Đang tải dữ liệu Ca tập..."
         isEmpty={slots.length === 0}
         emptyMessage="Chưa có dữ liệu ca tập nào"
       >
-                {slots.map((s) => {
-                  const linkedClass = s.class || classMap[s.class_id]
-                  return (
-                    <tr key={s.id}>
-                      <td>
-                        <div className="primary-cell">{linkedClass ? linkedClass.name : `Lớp #${s.class_id}`}</div>
-                        <div className="secondary-cell">Ca tập #{s.id}{linkedClass?.category ? ` · ${linkedClass.category}` : ''}</div>
-                      </td>
-                      <td>{(() => { const schedule = formatSchedule(s.start_time); return <><div className="schedule-date">{schedule.date}</div><div className="schedule-time">{schedule.time}</div></> })()}</td>
-                      <td>
-                        <div className="capacity-label"><span><strong>{s.current_bookings}</strong> / {s.max_capacity} chỗ</span></div>
-                        <div className="capacity-bar"><span style={{ width: `${Math.min(100, (s.current_bookings / (s.max_capacity || 1)) * 100)}%` }}></span>
-                        </div>
-                      </td>
-                      <td>
-                        <StatusBadge status={s.is_cancelled ? 'cancelled' : 'active'} />
-                      </td>
-                      <td className="text-end">
-                        <ActionMenu onEdit={() => handleOpenEdit(s)} onDelete={() => handleDelete(s.id)} />
-                      </td>
-                    </tr>
-                  )
-                })}
+        {slots.map((s) => {
+          const linkedClass = s.class || classMap[s.class_id]
+          return (
+            <tr key={s.id}>
+              <td>
+                <div className="primary-cell">{linkedClass ? linkedClass.name : `Lớp #${s.class_id}`}</div>
+                <div className="secondary-cell">Ca tập #{s.id}{linkedClass?.category ? ` · ${linkedClass.category}` : ''}</div>
+              </td>
+              <td>{(() => { const schedule = formatSchedule(s.start_time); return <><div className="schedule-date">{schedule.date}</div><div className="schedule-time">{schedule.time}</div></> })()}</td>
+              <td>
+                <div className="capacity-label"><span><strong>{s.current_bookings}</strong> / {s.max_capacity} chỗ</span></div>
+                <div className="capacity-bar"><span style={{ width: `${Math.min(100, (s.current_bookings / (s.max_capacity || 1)) * 100)}%` }}></span>
+                </div>
+              </td>
+              <td>
+                <StatusBadge status={s.is_cancelled ? 'cancelled' : 'active'} />
+              </td>
+              {isAdmin && (
+                <td className="text-end">
+                  <ActionMenu onEdit={() => handleOpenEdit(s)} onDelete={() => handleDelete(s.id)} />
+                </td>
+              )}
+            </tr>
+          )
+        })}
       </ManagementTable>
+
 
       {showModal && (
         <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
