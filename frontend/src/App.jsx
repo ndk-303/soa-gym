@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import LoginPage from './pages/LoginPage'
 import Navbar from './components/Navbar'
@@ -14,16 +14,43 @@ import AttendancePage from './pages/AttendancePage'
 import InvoicesPage from './pages/InvoicesPage'
 import PaymentsPage from './pages/PaymentsPage'
 
+// Member Portal Components
+import MemberDashboard from './pages/member/MemberDashboard'
+import MemberPlansPage from './pages/member/MemberPlansPage'
+import MemberClassesPage from './pages/member/MemberClassesPage'
+import MemberHistoryPage from './pages/member/MemberHistoryPage'
+import { resolveCurrentMember } from './utils/memberSession'
+
 function MainLayout() {
-  const { isAuthenticated, isAdmin } = useAuth()
+  const { isAuthenticated, isAdmin, user } = useAuth()
   const [activeTab, setActiveTab] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [currentMember, setCurrentMember] = useState(null)
+  const [memberLoading, setMemberLoading] = useState(false)
 
-  const adminOnlyTabs = ['users', 'members', 'plans', 'payments']
+  const loadCurrentMember = useCallback(async () => {
+    if (!user) return
+    setMemberLoading(true)
+    try {
+      const member = await resolveCurrentMember(user)
+      setCurrentMember(member)
+    } finally {
+      setMemberLoading(false)
+    }
+  }, [user])
 
-  // If user is member and current tab is restricted, redirect to dashboard
   useEffect(() => {
-    if (!isAdmin && adminOnlyTabs.includes(activeTab)) {
+    if (isAuthenticated && !isAdmin) {
+      loadCurrentMember()
+    }
+  }, [isAuthenticated, isAdmin, loadCurrentMember])
+
+  const memberTabs = ['dashboard', 'plans', 'classes', 'history']
+  const adminOnlyTabs = ['users', 'members', 'slots', 'bookings', 'attendance', 'invoices', 'payments']
+
+  // If user is member and current tab is not a valid member tab, redirect to dashboard
+  useEffect(() => {
+    if (!isAdmin && !memberTabs.includes(activeTab)) {
       setActiveTab('dashboard')
     }
   }, [isAdmin, activeTab])
@@ -33,7 +60,7 @@ function MainLayout() {
   }
 
   const handleTabChange = (tab) => {
-    if (!isAdmin && adminOnlyTabs.includes(tab)) {
+    if (!isAdmin && !memberTabs.includes(tab)) {
       return
     }
     setActiveTab(tab)
@@ -41,15 +68,51 @@ function MainLayout() {
   }
 
   const renderContent = () => {
+    if (!isAdmin) {
+      switch (activeTab) {
+        case 'dashboard':
+          return (
+            <MemberDashboard
+              onTabChange={handleTabChange}
+              currentMember={currentMember}
+              memberLoading={memberLoading}
+              onMemberRefresh={loadCurrentMember}
+            />
+          )
+        case 'plans':
+          return (
+            <MemberPlansPage
+              currentMember={currentMember}
+              onMemberRefresh={loadCurrentMember}
+              onTabChange={handleTabChange}
+            />
+          )
+        case 'classes':
+          return <MemberClassesPage currentMember={currentMember} />
+        case 'history':
+          return <MemberHistoryPage currentMember={currentMember} />
+        default:
+          return (
+            <MemberDashboard
+              onTabChange={handleTabChange}
+              currentMember={currentMember}
+              memberLoading={memberLoading}
+              onMemberRefresh={loadCurrentMember}
+            />
+          )
+      }
+    }
+
+    // Admin rendering
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard onTabChange={handleTabChange} />
       case 'users':
-        return isAdmin ? <UsersPage /> : <Dashboard onTabChange={handleTabChange} />
+        return <UsersPage />
       case 'members':
-        return isAdmin ? <MembersPage /> : <Dashboard onTabChange={handleTabChange} />
+        return <MembersPage />
       case 'plans':
-        return isAdmin ? <PlansPage /> : <Dashboard onTabChange={handleTabChange} />
+        return <PlansPage />
       case 'classes':
         return <ClassesPage />
       case 'slots':
@@ -61,7 +124,7 @@ function MainLayout() {
       case 'invoices':
         return <InvoicesPage />
       case 'payments':
-        return isAdmin ? <PaymentsPage /> : <Dashboard onTabChange={handleTabChange} />
+        return <PaymentsPage />
       default:
         return <Dashboard onTabChange={handleTabChange} />
     }

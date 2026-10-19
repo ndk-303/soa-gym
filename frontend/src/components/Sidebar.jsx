@@ -3,29 +3,29 @@ import { useAuth } from '../context/AuthContext'
 export default function Sidebar({ activeTab, onTabChange, isOpen }) {
   const { isAdmin } = useAuth()
 
-  const allMenuItems = [
+  const adminMenuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'bi-grid-1x2', section: 'Tổng quan' },
-    { id: 'users', label: 'Tài khoản', icon: 'bi-person', section: 'Hội viên', adminOnly: true },
-    { id: 'members', label: 'Hội viên', icon: 'bi-people', section: 'Hội viên', adminOnly: true },
-    { id: 'plans', label: 'Gói tập', icon: 'bi-card-list', section: 'Hội viên', adminOnly: true },
+    { id: 'users', label: 'Tài khoản', icon: 'bi-person', section: 'Hội viên' },
+    { id: 'members', label: 'Hội viên', icon: 'bi-people', section: 'Hội viên' },
+    { id: 'plans', label: 'Gói tập', icon: 'bi-card-list', section: 'Hội viên' },
     { id: 'classes', label: 'Lớp học', icon: 'bi-calendar-event', section: 'Vận hành' },
     { id: 'slots', label: 'Ca tập', icon: 'bi-clock', section: 'Vận hành' },
     { id: 'bookings', label: 'Đặt chỗ', icon: 'bi-bookmark-check', section: 'Vận hành' },
     { id: 'attendance', label: 'Điểm danh', icon: 'bi-qr-code-scan', section: 'Vận hành' },
     { id: 'invoices', label: 'Hóa đơn', icon: 'bi-receipt', section: 'Tài chính' },
-    { id: 'payments', label: 'Thanh toán', icon: 'bi-credit-card', section: 'Tài chính', adminOnly: true },
+    { id: 'payments', label: 'Thanh toán', icon: 'bi-credit-card', section: 'Tài chính' },
   ]
 
-  const menuItems = allMenuItems.filter((item) => {
-    if (item.adminOnly && !isAdmin) {
-      return false
-    }
-    return true
-  })
+  const memberMenuItems = [
+    { id: 'dashboard', label: 'Tổng quan', icon: 'bi-grid-1x2', section: 'Cá nhân' },
+    { id: 'plans', label: 'Gói tập', icon: 'bi-card-list', section: 'Dịch vụ' },
+    { id: 'classes', label: 'Lớp học', icon: 'bi-calendar-event', section: 'Dịch vụ' },
+    { id: 'history', label: 'Lịch sử giao dịch', icon: 'bi-receipt', section: 'Tài chính' },
+  ]
 
-  const sections = ['Tổng quan', 'Hội viên', 'Vận hành', 'Tài chính'].filter((sec) =>
-    menuItems.some((item) => item.section === sec)
-  )
+  const menuItems = isAdmin ? adminMenuItems : memberMenuItems
+
+  const sections = Array.from(new Set(menuItems.map((item) => item.section)))
 
   return (
     <aside className={`app-sidebar ${isOpen ? 'is-open' : ''}`}>
@@ -67,7 +67,7 @@ export default function Sidebar({ activeTab, onTabChange, isOpen }) {
             {isAdmin ? 'Quản trị viên' : 'Hội viên'}
           </div>
           <div className="sidebar-footer-text">
-            {isAdmin ? 'Đầy đủ quyền CRUD' : 'Chế độ cá nhân'}
+            {isAdmin ? 'Đầy đủ quyền CRUD' : 'Khu vực cá nhân'}
           </div>
         </div>
       </div>
