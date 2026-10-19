@@ -32,7 +32,7 @@ export default function BookingsPage() {
     setError(null)
     try {
       const [bookingsRes, membersRes, slotsRes, classesRes] = await Promise.all([
-        bookingsApi.getAll(),
+        bookingsApi.getDetailed(),
         membersApi.getAll(),
         slotsApi.getAll(),
         classesApi.getAll(),
@@ -141,9 +141,9 @@ export default function BookingsPage() {
         emptyMessage="Chưa có dữ liệu đặt chỗ nào"
       >
                 {bookings.map((b) => {
-                  const member = memberMap[b.member_id]
-                  const slot = slotMap[b.slot_id]
-                  const gymClass = slot ? classMap[slot.class_id] : null
+                  const member = b.member || memberMap[b.member_id]
+                  const slot = b.slot || slotMap[b.slot_id]
+                  const gymClass = slot?.class || (slot ? classMap[slot.class_id] : null)
                   return (
                     <tr key={b.id}>
                       <td>

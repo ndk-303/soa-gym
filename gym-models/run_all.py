@@ -111,9 +111,9 @@ def main():
 
     print("-" * 70)
     print(" [✓] All 6 Microservices and API Gateway are running!")
-    print(" [👉] API Gateway Swagger UI: http://127.0.0.1:8000/docs")
-    print(" [👉] API Gateway Health Check: http://127.0.0.1:8000/health")
-    print(" [👉] Frontend App: http://localhost:5173")
+    print(" [✓] API Gateway Swagger UI: http://127.0.0.1:8000/docs")
+    print(" [✓] API Gateway Health Check: http://127.0.0.1:8000/health")
+    print(" [✓] Frontend App: http://localhost:5173")
     print("-" * 70)
     print(" Press Ctrl + C to stop all services.\n")
 

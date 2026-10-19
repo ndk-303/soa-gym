@@ -31,7 +31,7 @@ export default function MembersPage() {
     setError(null)
     try {
       const [membersRes, usersRes, plansRes] = await Promise.all([
-        membersApi.getAll(),
+        membersApi.getDetailed(),
         usersApi.getAll(),
         plansApi.getAll(),
       ])
@@ -153,8 +153,8 @@ export default function MembersPage() {
         emptyMessage="Chưa có dữ liệu hội viên nào"
       >
                 {members.map((m) => {
-                  const linkedUser = userMap[m.user_id]
-                  const linkedPlan = planMap[m.membership_plan_id]
+                  const linkedUser = m.user || userMap[m.user_id]
+                  const linkedPlan = m.membership_plan || planMap[m.membership_plan_id]
                   return (
                     <tr key={m.id}>
                       <td className="identity-cell">

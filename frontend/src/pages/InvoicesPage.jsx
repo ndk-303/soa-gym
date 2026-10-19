@@ -30,7 +30,7 @@ export default function InvoicesPage() {
     setError(null)
     try {
       const [invoicesRes, membersRes] = await Promise.all([
-        invoicesApi.getAll(),
+        invoicesApi.getDetailed(),
         membersApi.getAll(),
       ])
       setInvoices(invoicesRes.data)
@@ -136,7 +136,7 @@ export default function InvoicesPage() {
         minWidth={1020}
       >
                 {invoices.map((inv) => {
-                  const member = memberMap[inv.member_id]
+                  const member = inv.member || memberMap[inv.member_id]
                   return (
                     <tr key={inv.id}>
                       <td><span className="technical-id">HĐ #{inv.id}</span></td>

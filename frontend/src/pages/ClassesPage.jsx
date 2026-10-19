@@ -29,7 +29,7 @@ export default function ClassesPage() {
     setError(null)
     try {
       const [classesRes, usersRes] = await Promise.all([
-        classesApi.getAll(),
+        classesApi.getDetailed(),
         usersApi.getAll(),
       ])
       setClasses(classesRes.data)
@@ -134,7 +134,7 @@ export default function ClassesPage() {
         emptyMessage="Chưa có dữ liệu lớp học nào"
       >
                 {classes.map((c) => {
-                  const trainer = userMap[c.trainer_id]
+                  const trainer = c.trainer || userMap[c.trainer_id]
                   return (
                     <tr key={c.id}>
                       <td><div className="primary-cell">{c.name}</div><div className="secondary-cell">Lớp #{c.id}</div></td>

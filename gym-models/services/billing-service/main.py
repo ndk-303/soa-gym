@@ -58,13 +58,11 @@ async def health():
 # ==================== Invoices Endpoints ====================
 
 @app.get("/invoices")
-@app.get("/invoices/")
 async def get_all_invoices(db: db_dependency):
     return db.query(Invoice).all()
 
 
 @app.get("/invoices/{id}")
-@app.get("/invoices/{id}/")
 async def get_invoice(db: db_dependency, id: int):
     invoice = db.query(Invoice).filter(Invoice.id == id).first()
     if invoice is None:
@@ -73,7 +71,6 @@ async def get_invoice(db: db_dependency, id: int):
 
 
 @app.post("/invoices", status_code=status.HTTP_201_CREATED)
-@app.post("/invoices/", status_code=status.HTTP_201_CREATED)
 async def create_invoice(db: db_dependency, invoice_request: Invoice_Request):
     invoice_model = Invoice(**invoice_request.dict())
     db.add(invoice_model)
@@ -83,7 +80,6 @@ async def create_invoice(db: db_dependency, invoice_request: Invoice_Request):
 
 
 @app.put("/invoices/{id}")
-@app.put("/invoices/{id}/")
 async def update_invoice(db: db_dependency, id: int, invoice_request: Invoice_Request):
     invoice = db.query(Invoice).filter(Invoice.id == id).first()
     if invoice is None:
@@ -99,7 +95,6 @@ async def update_invoice(db: db_dependency, id: int, invoice_request: Invoice_Re
 
 
 @app.delete("/invoices/{id}")
-@app.delete("/invoices/{id}/")
 async def delete_invoice(db: db_dependency, id: int):
     invoice = db.query(Invoice).filter(Invoice.id == id).first()
     if invoice is None:
@@ -112,13 +107,11 @@ async def delete_invoice(db: db_dependency, id: int):
 # ==================== Payments Endpoints ====================
 
 @app.get("/payments")
-@app.get("/payments/")
 async def get_all_payments(db: db_dependency):
     return db.query(Payment).all()
 
 
 @app.get("/payments/{id}")
-@app.get("/payments/{id}/")
 async def get_payment(db: db_dependency, id: int):
     payment = db.query(Payment).filter(Payment.id == id).first()
     if payment is None:
@@ -127,7 +120,6 @@ async def get_payment(db: db_dependency, id: int):
 
 
 @app.post("/payments", status_code=status.HTTP_201_CREATED)
-@app.post("/payments/", status_code=status.HTTP_201_CREATED)
 async def create_payment(db: db_dependency, payment_request: Payment_Request):
     payment_model = Payment(**payment_request.dict())
     db.add(payment_model)
@@ -137,7 +129,6 @@ async def create_payment(db: db_dependency, payment_request: Payment_Request):
 
 
 @app.put("/payments/{id}")
-@app.put("/payments/{id}/")
 async def update_payment(db: db_dependency, id: int, payment_request: Payment_Request):
     payment = db.query(Payment).filter(Payment.id == id).first()
     if payment is None:
@@ -153,7 +144,6 @@ async def update_payment(db: db_dependency, id: int, payment_request: Payment_Re
 
 
 @app.delete("/payments/{id}")
-@app.delete("/payments/{id}/")
 async def delete_payment(db: db_dependency, id: int):
     payment = db.query(Payment).filter(Payment.id == id).first()
     if payment is None:

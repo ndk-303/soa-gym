@@ -31,7 +31,7 @@ export default function AttendancePage() {
     setError(null)
     try {
       const [recordsRes, membersRes] = await Promise.all([
-        attendanceApi.getAll(),
+        attendanceApi.getDetailed(),
         membersApi.getAll(),
       ])
       setRecords(recordsRes.data)
@@ -140,7 +140,7 @@ export default function AttendancePage() {
         minWidth={900}
       >
                 {records.map((r) => {
-                  const member = memberMap[r.member_id]
+                  const member = r.member || memberMap[r.member_id]
                   return (
                     <tr key={r.id}>
                       <td>

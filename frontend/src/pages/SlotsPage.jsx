@@ -31,7 +31,7 @@ export default function SlotsPage() {
     setError(null)
     try {
       const [slotsRes, classesRes] = await Promise.all([
-        slotsApi.getAll(),
+        slotsApi.getDetailed(),
         classesApi.getAll(),
       ])
       setSlots(slotsRes.data)
@@ -137,7 +137,7 @@ export default function SlotsPage() {
         emptyMessage="Chưa có dữ liệu ca tập nào"
       >
                 {slots.map((s) => {
-                  const linkedClass = classMap[s.class_id]
+                  const linkedClass = s.class || classMap[s.class_id]
                   return (
                     <tr key={s.id}>
                       <td>

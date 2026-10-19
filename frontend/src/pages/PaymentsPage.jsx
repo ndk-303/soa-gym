@@ -30,7 +30,7 @@ export default function PaymentsPage() {
     setError(null)
     try {
       const [paymentsRes, invoicesRes, membersRes] = await Promise.all([
-        paymentsApi.getAll(),
+        paymentsApi.getDetailed(),
         invoicesApi.getAll(),
         membersApi.getAll(),
       ])
@@ -148,8 +148,8 @@ export default function PaymentsPage() {
         minWidth={900}
       >
                 {payments.map((p) => {
-                  const linkedInv = invoiceMap[p.invoice_id]
-                  const linkedMember = linkedInv ? memberMap[linkedInv.member_id] : null
+                  const linkedInv = p.invoice || invoiceMap[p.invoice_id]
+                  const linkedMember = p.member || linkedInv?.member || (linkedInv ? memberMap[linkedInv.member_id] : null)
                   return (
                     <tr key={p.id}>
                       <td><span className="technical-id">GD #{p.id}</span></td>
