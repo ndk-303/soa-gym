@@ -16,3 +16,9 @@ class User_Request(BaseModel):
                 'is_active': True,
             }
         }
+
+
+class Login_Request(BaseModel):
+    email: str
+    password: str
+

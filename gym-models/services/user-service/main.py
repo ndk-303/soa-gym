@@ -11,12 +11,19 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
+from datetime import datetime, timedelta, timezone
+import jwt
 import models
 from models import User
-from schemas import User_Request
+from schemas import User_Request, Login_Request
 from database import engine, SessionLocal, get_db
 
+SECRET_KEY = "gym_soa_jwt_secret_key_super_secure_32bytes_min"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_HOURS = 24
+
 app = FastAPI(title="User Service - Gym SOA", version="1.0.0")
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -56,7 +63,36 @@ async def get_all_users(db: db_dependency):
     return db.query(User).all()
 
 
+@app.post("/users/login")
+async def login(login_req: Login_Request, db: db_dependency):
+    user = db.query(User).filter(User.email == login_req.email).first()
+    if not user or user.password != login_req.password:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is deactivated")
+
+    expire = datetime.now(timezone.utc) + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
+    payload = {
+        "sub": str(user.id),
+        "email": user.email,
+        "role": user.role,
+        "exp": expire,
+    }
+    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "role": user.role,
+            "is_active": user.is_active,
+        }
+    }
+
+
 @app.get("/users/{id}")
+
 async def get_user(db: db_dependency, id: int):
     user = db.query(User).filter(User.id == id).first()
     if user is None:

@@ -19,6 +19,8 @@ def test_route_matching():
     assert match_service_url("/users") == ("http://127.0.0.1:8001", "/users")
     assert match_service_url("/users/1") == ("http://127.0.0.1:8001", "/users/1")
     assert match_service_url("/users/") == ("http://127.0.0.1:8001", "/users")
+    assert match_service_url("/api/users/login") == ("http://127.0.0.1:8001", "/users/login")
+    assert match_service_url("/api/auth/login") == ("http://127.0.0.1:8001", "/users/login")
 
     # Membership routes
     assert match_service_url("/api/membership-plans") == ("http://127.0.0.1:8002", "/membership-plans")

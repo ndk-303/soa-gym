@@ -189,3 +189,28 @@ def test_composite_aggregation_routes(run_all_services):
         if len(slots) > 0:
             assert "class" in slots[0]
 
+
+def test_auth_login_through_gateway(run_all_services):
+    gateway_url = run_all_services
+    with httpx.Client(base_url=gateway_url, timeout=5.0) as client:
+        # Admin login via /api/users/login
+        res_admin = client.post("/api/users/login", json={"email": "admin@gym.com", "password": "password123"})
+        assert res_admin.status_code == 200
+        data_admin = res_admin.json()
+        assert "access_token" in data_admin
+        assert data_admin["token_type"] == "bearer"
+        assert data_admin["user"]["email"] == "admin@gym.com"
+        assert data_admin["user"]["role"] == "admin"
+
+        # Member login via /api/auth/login alias
+        res_member = client.post("/api/auth/login", json={"email": "member.an@gym.com", "password": "password123"})
+        assert res_member.status_code == 200
+        data_member = res_member.json()
+        assert "access_token" in data_member
+        assert data_member["user"]["role"] == "member"
+
+        # Invalid login
+        res_invalid = client.post("/api/users/login", json={"email": "admin@gym.com", "password": "wrong"})
+        assert res_invalid.status_code == 401
+
+

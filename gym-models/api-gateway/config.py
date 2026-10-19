@@ -18,4 +18,5 @@ SERVICE_MAP = {
     "payments": (BILLING_SERVICE_URL, "/payments"),
     "attendances": (ATTENDANCE_SERVICE_URL, "/attendance"),
     "attendance": (ATTENDANCE_SERVICE_URL, "/attendance"),
+    "auth": (USER_SERVICE_URL, "/users"),
 }

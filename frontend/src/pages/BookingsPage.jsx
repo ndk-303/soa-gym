@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
+import { useAuth } from '../context/AuthContext'
 import { bookingsApi, membersApi, slotsApi, classesApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
 import { ActionMenu, ManagementHeader, ManagementTable } from '../components/ManagementUI'
 import { formatSchedule } from '../components/managementUtils'
 
 export default function BookingsPage() {
+  const { isAdmin } = useAuth()
   const [bookings, setBookings] = useState([])
+
   const [members, setMembers] = useState([])
   const [slots, setSlots] = useState([])
   const [classes, setClasses] = useState([])
@@ -129,42 +132,45 @@ export default function BookingsPage() {
 
       <ManagementTable
         columns={[
-          { key: 'member', label: 'Hội viên', width: '28%' },
-          { key: 'class', label: 'Lớp học / Ca tập', width: '18%' },
-          { key: 'waitlist', label: 'Vị trí chờ', width: '19%' },
-          { key: 'status', label: 'Trạng thái', width: '15%' },
-          { key: 'actions', label: 'Hành động', width: '190px', align: 'center' },
+          { key: 'member', label: 'Hội viên', width: isAdmin ? '28%' : '35%' },
+          { key: 'class', label: 'Lớp học / Ca tập', width: isAdmin ? '18%' : '25%' },
+          { key: 'waitlist', label: 'Vị trí chờ', width: isAdmin ? '19%' : '25%' },
+          { key: 'status', label: 'Trạng thái', width: isAdmin ? '15%' : '15%' },
+          ...(isAdmin ? [{ key: 'actions', label: 'Hành động', width: '190px', align: 'center' }] : []),
         ]}
         loading={loading}
         loadingMessage="Đang tải dữ liệu Đặt chỗ..."
         isEmpty={bookings.length === 0}
         emptyMessage="Chưa có dữ liệu đặt chỗ nào"
       >
-                {bookings.map((b) => {
-                  const member = b.member || memberMap[b.member_id]
-                  const slot = b.slot || slotMap[b.slot_id]
-                  const gymClass = slot?.class || (slot ? classMap[slot.class_id] : null)
-                  return (
-                    <tr key={b.id}>
-                      <td>
-                        <div className="primary-cell">{member ? member.full_name : `Hội viên #${b.member_id}`}</div>
-                        <div className="secondary-cell">{member?.email || `Đặt chỗ #${b.id}`}</div>
-                      </td>
-                      <td>
-                        <div className="primary-cell">{gymClass ? gymClass.name : `Ca #${b.slot_id}`}</div>
-                        <div className="secondary-cell">{slot ? (() => { const schedule = formatSchedule(slot.start_time); return `${schedule.date} · ${schedule.time}` })() : 'Chưa có lịch'}</div>
-                      </td>
-                      <td>{b.waitlist_position ? <span className="waitlist-value">#{b.waitlist_position}</span> : <span className="table-note">—</span>}</td>
-                      <td>
-                        <StatusBadge status={b.status} />
-                      </td>
-                      <td className="text-end">
-                        <ActionMenu onEdit={() => handleOpenEdit(b)} onDelete={() => handleDelete(b.id)} deleteLabel="Xóa đặt chỗ" />
-                      </td>
-                    </tr>
-                  )
-                })}
+        {bookings.map((b) => {
+          const member = b.member || memberMap[b.member_id]
+          const slot = b.slot || slotMap[b.slot_id]
+          const gymClass = slot?.class || (slot ? classMap[slot.class_id] : null)
+          return (
+            <tr key={b.id}>
+              <td>
+                <div className="primary-cell">{member ? member.full_name : `Hội viên #${b.member_id}`}</div>
+                <div className="secondary-cell">{member?.email || `Đặt chỗ #${b.id}`}</div>
+              </td>
+              <td>
+                <div className="primary-cell">{gymClass ? gymClass.name : `Ca #${b.slot_id}`}</div>
+                <div className="secondary-cell">{slot ? (() => { const schedule = formatSchedule(slot.start_time); return `${schedule.date} · ${schedule.time}` })() : 'Chưa có lịch'}</div>
+              </td>
+              <td>{b.waitlist_position ? <span className="waitlist-value">#{b.waitlist_position}</span> : <span className="table-note">—</span>}</td>
+              <td>
+                <StatusBadge status={b.status} />
+              </td>
+              {isAdmin && (
+                <td className="text-end">
+                  <ActionMenu onEdit={() => handleOpenEdit(b)} onDelete={() => handleDelete(b.id)} deleteLabel="Xóa đặt chỗ" />
+                </td>
+              )}
+            </tr>
+          )
+        })}
       </ManagementTable>
+
 
       {showModal && (
         <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>

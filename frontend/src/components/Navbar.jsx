@@ -1,4 +1,8 @@
+import { useAuth } from '../context/AuthContext'
+
 export default function Navbar({ onMenuToggle }) {
+  const { user, isAdmin, logout } = useAuth()
+
   return (
     <nav className="app-navbar">
       <div className="app-navbar-brand">
@@ -13,10 +17,35 @@ export default function Navbar({ onMenuToggle }) {
 
       <div className="app-navbar-meta">
         <span className="status-dot"></span>
-        <span className="d-none d-sm-inline">Hệ thống đang hoạt động</span>
+        <span className="d-none d-sm-inline text-muted small">Hệ thống phân tán</span>
         <span className="navbar-divider"></span>
-        <span className="admin-avatar">A</span>
-        <span className="d-none d-md-inline">Quản trị viên</span>
+
+        <span
+          className="admin-avatar"
+          style={{ backgroundColor: isAdmin ? '#2563eb' : '#10b981' }}
+          title={user?.email}
+        >
+          {isAdmin ? 'A' : 'M'}
+        </span>
+
+        <div className="d-flex flex-column text-start ms-1 d-none d-md-block" style={{ lineHeight: 1.2 }}>
+          <span className="fw-semibold small text-dark">
+            {isAdmin ? 'Quản trị viên' : 'Hội viên'}
+          </span>
+          <span className="text-muted" style={{ fontSize: '0.75rem' }}>
+            {user?.email}
+          </span>
+        </div>
+
+        <button
+          type="button"
+          className="btn btn-outline-danger btn-sm ms-3 d-flex align-items-center py-1 px-2 rounded-2"
+          onClick={logout}
+          title="Đăng xuất"
+        >
+          <i className="bi bi-box-arrow-right me-1"></i>
+          <span className="d-none d-sm-inline">Đăng xuất</span>
+        </button>
       </div>
     </nav>
   )

@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
+import { useAuth } from '../context/AuthContext'
 import { invoicesApi, membersApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
 import { ActionMenu, ManagementHeader, ManagementTable } from '../components/ManagementUI'
 import { formatVnd } from '../components/managementUtils'
 
 export default function InvoicesPage() {
+  const { isAdmin } = useAuth()
   const [invoices, setInvoices] = useState([])
+
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -111,7 +114,13 @@ export default function InvoicesPage() {
 
   return (
     <div>
-      <ManagementHeader title="Hóa đơn" description="Theo dõi công nợ, số tiền đã thanh toán và trạng thái hóa đơn" onRefresh={fetchData} onAdd={handleOpenAdd} addLabel="Tạo hóa đơn" />
+      <ManagementHeader
+        title="Hóa đơn"
+        description="Theo dõi công nợ, số tiền đã thanh toán và trạng thái hóa đơn"
+        onRefresh={fetchData}
+        onAdd={isAdmin ? handleOpenAdd : undefined}
+        addLabel="Tạo hóa đơn"
+      />
 
       {error && (
         <div className="management-error" role="alert">
@@ -121,13 +130,13 @@ export default function InvoicesPage() {
 
       <ManagementTable
         columns={[
-          { key: 'invoice', label: 'Mã hóa đơn', width: '13%' },
-          { key: 'member', label: 'Hội viên', width: '20%' },
-          { key: 'amount', label: 'Tổng tiền', width: '13%', align: 'right' },
-          { key: 'paid', label: 'Đã thanh toán', width: '13%', align: 'right' },
-          { key: 'remaining', label: 'Còn lại', width: '13%', align: 'right' },
-          { key: 'status', label: 'Trạng thái', width: '12%' },
-          { key: 'actions', label: 'Hành động', width: '190px', align: 'center' },
+          { key: 'invoice', label: 'Mã hóa đơn', width: isAdmin ? '13%' : '15%' },
+          { key: 'member', label: 'Hội viên', width: isAdmin ? '20%' : '25%' },
+          { key: 'amount', label: 'Tổng tiền', width: isAdmin ? '13%' : '15%', align: 'right' },
+          { key: 'paid', label: 'Đã thanh toán', width: isAdmin ? '13%' : '15%', align: 'right' },
+          { key: 'remaining', label: 'Còn lại', width: isAdmin ? '13%' : '15%', align: 'right' },
+          { key: 'status', label: 'Trạng thái', width: isAdmin ? '12%' : '15%' },
+          ...(isAdmin ? [{ key: 'actions', label: 'Hành động', width: '190px', align: 'center' }] : []),
         ]}
         loading={loading}
         loadingMessage="Đang tải dữ liệu Hóa đơn..."
@@ -135,28 +144,31 @@ export default function InvoicesPage() {
         emptyMessage="Chưa có dữ liệu hóa đơn nào"
         minWidth={1020}
       >
-                {invoices.map((inv) => {
-                  const member = inv.member || memberMap[inv.member_id]
-                  return (
-                    <tr key={inv.id}>
-                      <td><span className="technical-id">HĐ #{inv.id}</span></td>
-                      <td>
-                        <div className="primary-cell">{member ? member.full_name : `Hội viên #${inv.member_id}`}</div>
-                        <div className="secondary-cell">{member?.email || 'Chưa có email'}</div>
-                      </td>
-                      <td className="money">{formatVnd(inv.amount)}</td>
-                      <td className="money">{formatVnd(inv.amount_paid)}</td>
-                      <td className="money">{formatVnd(Math.max(0, Number(inv.amount) - Number(inv.amount_paid)))}</td>
-                      <td>
-                        <StatusBadge status={inv.status} />
-                      </td>
-                      <td className="text-end">
-                        <ActionMenu onEdit={() => handleOpenEdit(inv)} onDelete={() => handleDelete(inv.id)} />
-                      </td>
-                    </tr>
-                  )
-                })}
+        {invoices.map((inv) => {
+          const member = inv.member || memberMap[inv.member_id]
+          return (
+            <tr key={inv.id}>
+              <td><span className="technical-id">HĐ #{inv.id}</span></td>
+              <td>
+                <div className="primary-cell">{member ? member.full_name : `Hội viên #${inv.member_id}`}</div>
+                <div className="secondary-cell">{member?.email || 'Chưa có email'}</div>
+              </td>
+              <td className="money">{formatVnd(inv.amount)}</td>
+              <td className="money">{formatVnd(inv.amount_paid)}</td>
+              <td className="money">{formatVnd(Math.max(0, Number(inv.amount) - Number(inv.amount_paid)))}</td>
+              <td>
+                <StatusBadge status={inv.status} />
+              </td>
+              {isAdmin && (
+                <td className="text-end">
+                  <ActionMenu onEdit={() => handleOpenEdit(inv)} onDelete={() => handleDelete(inv.id)} />
+                </td>
+              )}
+            </tr>
+          )
+        })}
       </ManagementTable>
+
 
       {showModal && (
         <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
