@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import LoginPage from './pages/LoginPage'
 import Navbar from './components/Navbar'
@@ -20,6 +20,8 @@ import MemberPlansPage from './pages/member/MemberPlansPage'
 import MemberClassesPage from './pages/member/MemberClassesPage'
 import MemberHistoryPage from './pages/member/MemberHistoryPage'
 import { resolveCurrentMember } from './utils/memberSession'
+
+const MEMBER_TABS = ['dashboard', 'plans', 'classes', 'history']
 
 function MainLayout() {
   const { isAuthenticated, isAdmin, user } = useAuth()
@@ -45,12 +47,9 @@ function MainLayout() {
     }
   }, [isAuthenticated, isAdmin, loadCurrentMember])
 
-  const memberTabs = ['dashboard', 'plans', 'classes', 'history']
-  const adminOnlyTabs = ['users', 'members', 'slots', 'bookings', 'attendance', 'invoices', 'payments']
-
   // If user is member and current tab is not a valid member tab, redirect to dashboard
   useEffect(() => {
-    if (!isAdmin && !memberTabs.includes(activeTab)) {
+    if (!isAdmin && !MEMBER_TABS.includes(activeTab)) {
       setActiveTab('dashboard')
     }
   }, [isAdmin, activeTab])
@@ -60,7 +59,7 @@ function MainLayout() {
   }
 
   const handleTabChange = (tab) => {
-    if (!isAdmin && !memberTabs.includes(tab)) {
+    if (!isAdmin && !MEMBER_TABS.includes(tab)) {
       return
     }
     setActiveTab(tab)

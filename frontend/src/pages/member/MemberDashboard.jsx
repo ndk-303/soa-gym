@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { plansApi, attendanceApi, invoicesApi } from '../../services/api'
 import StatusBadge from '../../components/StatusBadge'
 import AttendanceCalendar from './AttendanceCalendar'
@@ -11,8 +11,10 @@ export default function MemberDashboard({ onTabChange, currentMember, memberLoad
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
+  const memberId = currentMember?.id
+
   const loadData = useCallback(async () => {
-    if (!currentMember?.id) return
+    if (!memberId) return
     setLoading(true)
     setError(null)
     try {
@@ -29,51 +31,63 @@ export default function MemberDashboard({ onTabChange, currentMember, memberLoad
       if (attendanceRes.status === 'fulfilled') {
         const allAtt = attendanceRes.value.data || []
         // Filter attendance for current member
-        const memberAtt = allAtt.filter((a) => String(a.member_id) === String(currentMember.id))
+        const memberAtt = allAtt.filter((a) => String(a.member_id) === String(memberId))
         setAttendanceRecords(memberAtt)
       }
 
       if (invoicesRes.status === 'fulfilled') {
         const allInv = invoicesRes.value.data || []
-        const memberInv = allInv.filter((inv) => String(inv.member_id) === String(currentMember.id))
+        const memberInv = allInv.filter((inv) => String(inv.member_id) === String(memberId))
         setInvoices(memberInv)
       }
-    } catch (err) {
+    } catch {
       setError('Lỗi khi tải thông tin hội viên')
     } finally {
       setLoading(false)
     }
-  }, [currentMember?.id])
+  }, [memberId])
 
   useEffect(() => {
     loadData()
   }, [loadData])
 
   // Resolve current plan
-  const currentPlan = plans.find((p) => Number(p.id) === Number(currentMember?.membership_plan_id))
+  const currentPlan = useMemo(() => {
+    return plans.find((p) => Number(p.id) === Number(currentMember?.membership_plan_id))
+  }, [plans, currentMember?.membership_plan_id])
 
   // Find latest paid invoice for plan duration calculation
-  const latestPaidInvoice = invoices
-    .filter((inv) => inv.status === 'paid')
-    .sort((a, b) => b.id - a.id)[0]
+  const latestPaidInvoice = useMemo(() => {
+    return invoices
+      .filter((inv) => inv.status === 'paid')
+      .sort((a, b) => b.id - a.id)[0]
+  }, [invoices])
 
   // Calculate activation & expiration dates
-  let activationDate = new Date()
-  if (latestPaidInvoice?.created_at) {
-    const parsed = new Date(latestPaidInvoice.created_at)
-    if (!Number.isNaN(parsed.getTime())) {
-      activationDate = parsed
+  const planTimeline = useMemo(() => {
+    let activationDate = new Date()
+    if (latestPaidInvoice?.created_at) {
+      const parsed = new Date(latestPaidInvoice.created_at)
+      if (!Number.isNaN(parsed.getTime())) {
+        activationDate = parsed
+      }
     }
-  }
 
-  const durationDays = currentPlan?.duration_days || 30
-  const expirationDate = new Date(activationDate.getTime() + durationDays * 24 * 60 * 60 * 1000)
+    const durationDays = currentPlan?.duration_days || 30
+    const expirationDate = new Date(activationDate.getTime() + durationDays * 24 * 60 * 60 * 1000)
 
-  const now = new Date()
-  const diffTime = expirationDate.getTime() - now.getTime()
-  const remainingDays = currentPlan
-    ? Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
-    : 0
+    const now = new Date()
+    const diffTime = expirationDate.getTime() - now.getTime()
+    const remainingDays = currentPlan
+      ? Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
+      : 0
+
+    return {
+      activationDate,
+      expirationDate,
+      remainingDays,
+    }
+  }, [latestPaidInvoice, currentPlan])
 
   const formatDisplayDate = (d) => {
     return new Intl.DateTimeFormat('vi-VN', {
@@ -84,13 +98,15 @@ export default function MemberDashboard({ onTabChange, currentMember, memberLoad
   }
 
   // Count unique days attended
-  const uniqueAttendanceDays = new Set(
-    attendanceRecords
-      .map((a) => a.check_in_time?.split(' ')[0]?.split('T')[0])
-      .filter(Boolean)
-  ).size
+  const uniqueAttendanceDays = useMemo(() => {
+    return new Set(
+      attendanceRecords
+        .map((a) => a.check_in_time?.split(' ')[0]?.split('T')[0])
+        .filter(Boolean)
+    ).size
+  }, [attendanceRecords])
 
-  const isPendingWarning = remainingDays > 0 && remainingDays <= 7
+  const isPendingWarning = planTimeline.remainingDays > 0 && planTimeline.remainingDays <= 7
 
   return (
     <div className="member-dashboard">
@@ -186,7 +202,7 @@ export default function MemberDashboard({ onTabChange, currentMember, memberLoad
               {loading ? (
                 <span className="kpi-skeleton"></span>
               ) : currentPlan ? (
-                `${remainingDays} ngày`
+                `${planTimeline.remainingDays} ngày`
               ) : (
                 '0 ngày'
               )}
@@ -208,13 +224,13 @@ export default function MemberDashboard({ onTabChange, currentMember, memberLoad
               {loading ? (
                 <span className="kpi-skeleton"></span>
               ) : currentPlan ? (
-                formatDisplayDate(expirationDate)
+                formatDisplayDate(planTimeline.expirationDate)
               ) : (
                 '—'
               )}
             </div>
             <div className="kpi-card-label">
-              {currentPlan ? `Kích hoạt từ: ${formatDisplayDate(activationDate)}` : 'Chưa có thông tin'}
+              {currentPlan ? `Kích hoạt từ: ${formatDisplayDate(planTimeline.activationDate)}` : 'Chưa có thông tin'}
             </div>
           </div>
         </div>

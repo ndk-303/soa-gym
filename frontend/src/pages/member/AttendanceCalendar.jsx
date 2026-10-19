@@ -3,7 +3,12 @@ import { useState, useMemo } from 'react'
 export default function AttendanceCalendar({ checkInRecords = [] }) {
   const [viewDate, setViewDate] = useState(() => new Date())
 
-  const now = new Date()
+  // Stable today reference
+  const todayDateObj = useMemo(() => new Date(), [])
+  const todayYear = todayDateObj.getFullYear()
+  const todayMonth = todayDateObj.getMonth()
+  const todayDay = todayDateObj.getDate()
+
   const currentYear = viewDate.getFullYear()
   const currentMonth = viewDate.getMonth() // 0-indexed
 
@@ -30,10 +35,14 @@ export default function AttendanceCalendar({ checkInRecords = [] }) {
   }, [checkInRecords])
 
   // Compute days in month
-  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate()
+  const daysInMonth = useMemo(() => {
+    return new Date(currentYear, currentMonth + 1, 0).getDate()
+  }, [currentYear, currentMonth])
 
   // First day of week index (Monday = 0, ..., Sunday = 6)
-  const firstDayOfWeek = (new Date(currentYear, currentMonth, 1).getDay() + 6) % 7
+  const firstDayOfWeek = useMemo(() => {
+    return (new Date(currentYear, currentMonth, 1).getDay() + 6) % 7
+  }, [currentYear, currentMonth])
 
   // Days in month calculation
   const calendarSlots = useMemo(() => {
@@ -48,9 +57,9 @@ export default function AttendanceCalendar({ checkInRecords = [] }) {
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
       const isToday =
-        now.getFullYear() === currentYear &&
-        now.getMonth() === currentMonth &&
-        now.getDate() === d
+        todayYear === currentYear &&
+        todayMonth === currentMonth &&
+        todayDay === d
 
       const checkIns = checkInMap.get(dateStr) || []
       const isCheckedIn = checkIns.length > 0
@@ -67,7 +76,7 @@ export default function AttendanceCalendar({ checkInRecords = [] }) {
     }
 
     return slots
-  }, [currentYear, currentMonth, daysInMonth, firstDayOfWeek, checkInMap, now])
+  }, [currentYear, currentMonth, daysInMonth, firstDayOfWeek, checkInMap, todayYear, todayMonth, todayDay])
 
   // Count check-ins in the currently viewed month
   const monthCheckInCount = useMemo(() => {
