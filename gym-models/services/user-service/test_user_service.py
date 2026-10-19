@@ -89,3 +89,32 @@ def test_user_login_invalid_credentials(client):
     res2 = client.post("/users/login", json={"email": "nonexistent@gym.com", "password": "password123"})
     assert res2.status_code == 401
 
+def test_password_hashing_and_verification(client):
+    import uuid
+    unique_email = f"hashed.{uuid.uuid4().hex[:8]}@gym.com"
+    new_user = {
+        "email": unique_email,
+        "role": "member",
+        "password": "mysecretpassword",
+        "is_active": True
+    }
+    create_res = client.post("/users", json=new_user)
+    assert create_res.status_code == 201
+    user_id = create_res.json()["id"]
+
+    # Verify that the password is not stored in plain text
+    get_res = client.get(f"/users/{user_id}")
+    assert get_res.status_code == 200
+    stored_password = get_res.json()["password"]
+    assert stored_password != "mysecretpassword"
+    assert stored_password.startswith("$argon2")
+
+    # Verify that login works with the plain password
+    login_res = client.post("/users/login", json={"email": unique_email, "password": "mysecretpassword"})
+    assert login_res.status_code == 200
+
+    # Cleanup
+    client.delete(f"/users/{user_id}")
+
+
+

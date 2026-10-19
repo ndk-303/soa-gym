@@ -16,7 +16,6 @@ export default function Sidebar({ activeTab, onTabChange, isOpen }) {
     { id: 'payments', label: 'Thanh toán', icon: 'bi-credit-card', section: 'Tài chính', adminOnly: true },
   ]
 
-  // Filter based on role
   const menuItems = allMenuItems.filter((item) => {
     if (item.adminOnly && !isAdmin) {
       return false
@@ -30,10 +29,6 @@ export default function Sidebar({ activeTab, onTabChange, isOpen }) {
 
   return (
     <aside className={`app-sidebar ${isOpen ? 'is-open' : ''}`}>
-      <div className="sidebar-caption">
-        {isAdmin ? 'Quản trị hệ thống' : 'Không gian hội viên'}
-      </div>
-
       <div className="sidebar-navigation">
         {sections.map((section) => (
           <div key={section} className="sidebar-group">
@@ -48,6 +43,8 @@ export default function Sidebar({ activeTab, onTabChange, isOpen }) {
                   return (
                     <button
                       key={item.id}
+                      type="button"
+                      aria-current={isActive ? 'page' : undefined}
                       onClick={() => onTabChange(item.id)}
                       className={`sidebar-link ${isActive ? 'is-active' : ''}`}
                     >
@@ -67,10 +64,10 @@ export default function Sidebar({ activeTab, onTabChange, isOpen }) {
         </span>
         <div>
           <div className="sidebar-footer-title">
-            {isAdmin ? 'Quyền Quản trị viên' : 'Quyền Hội viên'}
+            {isAdmin ? 'Quản trị viên' : 'Hội viên'}
           </div>
           <div className="sidebar-footer-text">
-            {isAdmin ? 'Đầy đủ quyền CRUD' : 'Chế độ xem cá nhân'}
+            {isAdmin ? 'Đầy đủ quyền CRUD' : 'Chế độ cá nhân'}
           </div>
         </div>
       </div>
