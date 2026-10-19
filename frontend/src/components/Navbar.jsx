@@ -1,16 +1,22 @@
-export default function Navbar({ activeTab, onTabChange }) {
+export default function Navbar({ onMenuToggle }) {
   return (
-    <nav className="navbar navbar-expand-lg navbar-dark bg-dark px-4 shadow-sm border-bottom border-secondary">
-      <div className="container-fluid">
-        <span className="navbar-brand d-flex align-items-center gap-2 fw-bold text-warning fs-4">
-          <i className="bi bi-fire text-danger fs-3"></i>
-          SOA GYM CENTER
+    <nav className="app-navbar">
+      <div className="app-navbar-brand">
+        <button className="mobile-menu-button" type="button" onClick={onMenuToggle} aria-label="Mở menu">
+          <i className="bi bi-list"></i>
+        </button>
+        <span className="brand-mark">
+          <img src="/logo.svg" alt="SOA Gym Center" className="brand-logo" />
         </span>
-        <div className="d-flex align-items-center gap-3">
-          <div className="text-light small d-none d-md-block">
-            <i className="bi bi-person-circle me-1"></i> Admin Portal
-          </div>
-        </div>
+        <span>SOA Gym Center</span>
+      </div>
+
+      <div className="app-navbar-meta">
+        <span className="status-dot"></span>
+        <span className="d-none d-sm-inline">Hệ thống đang hoạt động</span>
+        <span className="navbar-divider"></span>
+        <span className="admin-avatar">A</span>
+        <span className="d-none d-md-inline">Quản trị viên</span>
       </div>
     </nav>
   )

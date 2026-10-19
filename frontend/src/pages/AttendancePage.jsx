@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { attendanceApi, membersApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
-import LoadingSpinner from '../components/LoadingSpinner'
+import { ActionMenu, ManagementHeader, ManagementTable } from '../components/ManagementUI'
+import { formatDateTime } from '../components/managementUtils'
 
 export default function AttendancePage() {
   const [records, setRecords] = useState([])
@@ -25,12 +26,12 @@ export default function AttendancePage() {
     fetchData()
   }, [])
 
-  const fetchData = async () => {
+  async function fetchData() {
     setLoading(true)
     setError(null)
     try {
       const [recordsRes, membersRes] = await Promise.all([
-        attendanceApi.getAll(),
+        attendanceApi.getDetailed(),
         membersApi.getAll(),
       ])
       setRecords(recordsRes.data)
@@ -115,86 +116,50 @@ export default function AttendancePage() {
 
   return (
     <div>
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <div>
-          <h3 className="fw-bold mb-1">
-            <i className="bi bi-qr-code-scan text-secondary me-2"></i>
-            Quản lý Điểm danh (Attendance)
-          </h3>
-          <p className="text-muted small mb-0">Theo dõi lượt check-in / check-out của hội viên tại phòng tập</p>
-        </div>
-        <div className="d-flex gap-2">
-          <button className="btn btn-outline-secondary btn-sm" onClick={fetchData}>
-            <i className="bi bi-arrow-clockwise me-1"></i> Làm mới
-          </button>
-          <button className="btn btn-primary btn-sm" onClick={handleOpenAdd}>
-            <i className="bi bi-plus-lg me-1"></i> Quét Check-in
-          </button>
-        </div>
-      </div>
+      <ManagementHeader title="Điểm danh" description="Theo dõi lượt check-in và check-out của hội viên tại phòng tập" onRefresh={fetchData} onAdd={handleOpenAdd} addLabel="Ghi nhận check-in" />
 
       {error && (
-        <div className="alert alert-danger py-2 small" role="alert">
+        <div className="management-error" role="alert">
           <i className="bi bi-exclamation-circle me-2"></i> {error}
         </div>
       )}
 
-      <div className="card border-0 shadow-sm">
-        <div className="table-responsive">
-          {loading ? (
-            <LoadingSpinner message="Đang tải dữ liệu Điểm danh..." />
-          ) : records.length === 0 ? (
-            <div className="text-center py-5 text-muted">
-              <i className="bi bi-inbox fs-1 d-block mb-2 text-secondary"></i>
-              Chưa có dữ liệu điểm danh nào
-            </div>
-          ) : (
-            <table className="table table-hover align-middle mb-0">
-              <thead className="table-light">
-                <tr>
-                  <th style={{ width: '60px' }}>ID</th>
-                  <th>Hội viên</th>
-                  <th>Thời gian Check-in</th>
-                  <th>Thời gian Check-out</th>
-                  <th>Ghi chú</th>
-                  <th>Trạng thái</th>
-                  <th style={{ width: '140px' }} className="text-end">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
+      <ManagementTable
+        columns={[
+          { key: 'member', label: 'Hội viên', width: '21%' },
+          { key: 'checkIn', label: 'Giờ check-in', width: '21%' },
+          { key: 'checkOut', label: 'Giờ check-out', width: '15%' },
+          { key: 'notes', label: 'Ghi chú', width: '15%' },
+          { key: 'status', label: 'Trạng thái', width: '13%' },
+          { key: 'actions', label: 'Hành động', width: '190px', align: 'center' },
+        ]}
+        loading={loading}
+        loadingMessage="Đang tải dữ liệu Điểm danh..."
+        isEmpty={records.length === 0}
+        emptyMessage="Chưa có dữ liệu điểm danh nào"
+        minWidth={900}
+      >
                 {records.map((r) => {
-                  const member = memberMap[r.member_id]
+                  const member = r.member || memberMap[r.member_id]
                   return (
                     <tr key={r.id}>
-                      <td className="fw-bold text-secondary">#{r.id}</td>
                       <td>
-                        <span className="badge bg-success-subtle text-success-emphasis border">
-                          <i className="bi bi-person me-1"></i>
-                          {member ? `${member.full_name} (${member.email})` : `Hội viên #${r.member_id}`}
-                        </span>
+                        <div className="primary-cell">{member ? member.full_name : `Hội viên #${r.member_id}`}</div>
+                        <div className="secondary-cell">Bản ghi #{r.id}{member?.email ? ` · ${member.email}` : ''}</div>
                       </td>
-                      <td className="text-nowrap">{r.check_in_time}</td>
-                      <td className="text-nowrap">{r.check_out_time || <span className="text-muted small">Đang tập...</span>}</td>
-                      <td>{r.notes || <span className="text-muted small">-</span>}</td>
+                      <td className="text-nowrap">{formatDateTime(r.check_in_time)}</td>
+                      <td className="text-nowrap">{r.check_out_time ? formatDateTime(r.check_out_time) : <span className="table-note">—</span>}</td>
+                      <td>{r.notes || <span className="table-note">—</span>}</td>
                       <td>
                         <StatusBadge status={r.status} />
                       </td>
                       <td className="text-end">
-                        <button className="btn btn-sm btn-outline-primary me-1" onClick={() => handleOpenEdit(r)}>
-                          <i className="bi bi-pencil"></i>
-                        </button>
-                        <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(r.id)}>
-                          <i className="bi bi-trash"></i>
-                        </button>
+                        <ActionMenu onEdit={() => handleOpenEdit(r)} onDelete={() => handleDelete(r.id)} />
                       </td>
                     </tr>
                   )
                 })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+      </ManagementTable>
 
       {showModal && (
         <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>

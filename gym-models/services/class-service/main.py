@@ -58,13 +58,11 @@ async def health():
 # ==================== Gym Classes Endpoints ====================
 
 @app.get("/gym-classes")
-@app.get("/gym-classes/")
 async def get_all_classes(db: db_dependency):
     return db.query(GymClass).all()
 
 
 @app.get("/gym-classes/{id}")
-@app.get("/gym-classes/{id}/")
 async def get_class(db: db_dependency, id: int):
     gym_class = db.query(GymClass).filter(GymClass.id == id).first()
     if gym_class is None:
@@ -73,7 +71,6 @@ async def get_class(db: db_dependency, id: int):
 
 
 @app.post("/gym-classes", status_code=status.HTTP_201_CREATED)
-@app.post("/gym-classes/", status_code=status.HTTP_201_CREATED)
 async def create_class(db: db_dependency, class_request: GymClass_Request):
     class_model = GymClass(**class_request.dict())
     db.add(class_model)
@@ -83,7 +80,6 @@ async def create_class(db: db_dependency, class_request: GymClass_Request):
 
 
 @app.put("/gym-classes/{id}")
-@app.put("/gym-classes/{id}/")
 async def update_class(db: db_dependency, id: int, class_request: GymClass_Request):
     gym_class = db.query(GymClass).filter(GymClass.id == id).first()
     if gym_class is None:
@@ -99,7 +95,6 @@ async def update_class(db: db_dependency, id: int, class_request: GymClass_Reque
 
 
 @app.delete("/gym-classes/{id}")
-@app.delete("/gym-classes/{id}/")
 async def delete_class(db: db_dependency, id: int):
     gym_class = db.query(GymClass).filter(GymClass.id == id).first()
     if gym_class is None:
@@ -112,13 +107,11 @@ async def delete_class(db: db_dependency, id: int):
 # ==================== Class Slots Endpoints ====================
 
 @app.get("/class-slots")
-@app.get("/class-slots/")
 async def get_all_slots(db: db_dependency):
     return db.query(ClassSlot).all()
 
 
 @app.get("/class-slots/{id}")
-@app.get("/class-slots/{id}/")
 async def get_slot(db: db_dependency, id: int):
     slot = db.query(ClassSlot).filter(ClassSlot.id == id).first()
     if slot is None:
@@ -127,7 +120,6 @@ async def get_slot(db: db_dependency, id: int):
 
 
 @app.post("/class-slots", status_code=status.HTTP_201_CREATED)
-@app.post("/class-slots/", status_code=status.HTTP_201_CREATED)
 async def create_slot(db: db_dependency, slot_request: ClassSlot_Request):
     slot_model = ClassSlot(**slot_request.dict())
     db.add(slot_model)
@@ -137,7 +129,6 @@ async def create_slot(db: db_dependency, slot_request: ClassSlot_Request):
 
 
 @app.put("/class-slots/{id}")
-@app.put("/class-slots/{id}/")
 async def update_slot(db: db_dependency, id: int, slot_request: ClassSlot_Request):
     slot = db.query(ClassSlot).filter(ClassSlot.id == id).first()
     if slot is None:
@@ -154,7 +145,6 @@ async def update_slot(db: db_dependency, id: int, slot_request: ClassSlot_Reques
 
 
 @app.delete("/class-slots/{id}")
-@app.delete("/class-slots/{id}/")
 async def delete_slot(db: db_dependency, id: int):
     slot = db.query(ClassSlot).filter(ClassSlot.id == id).first()
     if slot is None:

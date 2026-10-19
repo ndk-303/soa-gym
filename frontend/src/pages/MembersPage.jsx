@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { membersApi, usersApi, plansApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
-import LoadingSpinner from '../components/LoadingSpinner'
+import { ActionMenu, ManagementHeader, ManagementTable } from '../components/ManagementUI'
 
 export default function MembersPage() {
   const [members, setMembers] = useState([])
@@ -26,12 +26,12 @@ export default function MembersPage() {
     fetchData()
   }, [])
 
-  const fetchData = async () => {
+  async function fetchData() {
     setLoading(true)
     setError(null)
     try {
       const [membersRes, usersRes, plansRes] = await Promise.all([
-        membersApi.getAll(),
+        membersApi.getDetailed(),
         usersApi.getAll(),
         plansApi.getAll(),
       ])
@@ -131,95 +131,56 @@ export default function MembersPage() {
 
   return (
     <div>
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <div>
-          <h3 className="fw-bold mb-1">
-            <i className="bi bi-person-badge text-secondary me-2"></i>
-            Quản lý Hội viên (Members)
-          </h3>
-          <p className="text-muted small mb-0">Hồ sơ hội viên, thông tin gói tập hiện tại và trạng thái kích hoạt</p>
-        </div>
-        <div className="d-flex gap-2">
-          <button className="btn btn-outline-secondary btn-sm" onClick={fetchData}>
-            <i className="bi bi-arrow-clockwise me-1"></i> Làm mới
-          </button>
-          <button className="btn btn-primary btn-sm" onClick={handleOpenAdd}>
-            <i className="bi bi-plus-lg me-1"></i> Thêm Hội viên
-          </button>
-        </div>
-      </div>
+      <ManagementHeader title="Hội viên" description="Hồ sơ hội viên, gói tập hiện tại và trạng thái kích hoạt" onRefresh={fetchData} onAdd={handleOpenAdd} addLabel="Thêm hội viên" />
 
       {error && (
-        <div className="alert alert-danger py-2 small" role="alert">
+        <div className="management-error" role="alert">
           <i className="bi bi-exclamation-circle me-2"></i> {error}
         </div>
       )}
 
-      <div className="card border-0 shadow-sm">
-        <div className="table-responsive">
-          {loading ? (
-            <LoadingSpinner message="Đang tải dữ liệu Hội viên..." />
-          ) : members.length === 0 ? (
-            <div className="text-center py-5 text-muted">
-              <i className="bi bi-inbox fs-1 d-block mb-2 text-secondary"></i>
-              Chưa có dữ liệu hội viên nào
-            </div>
-          ) : (
-            <table className="table table-hover align-middle mb-0">
-              <thead className="table-light">
-                <tr>
-                  <th style={{ width: '60px' }}>ID</th>
-                  <th>Họ và Tên</th>
-                  <th>Email</th>
-                  <th>Tài khoản User</th>
-                  <th>Gói tập hiện tại</th>
-                  <th>Trạng thái</th>
-                  <th style={{ width: '140px' }} className="text-end">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
+      <ManagementTable
+        columns={[
+          { key: 'member', label: 'Hội viên', width: '28%' },
+          { key: 'user', label: 'Tài khoản User', width: '18%' },
+          { key: 'plan', label: 'Gói tập hiện tại', width: '19%' },
+          { key: 'status', label: 'Trạng thái', width: '15%' },
+          { key: 'actions', label: 'Hành động', width: '190px', align: 'center' },
+        ]}
+        loading={loading}
+        loadingMessage="Đang tải dữ liệu Hội viên..."
+        isEmpty={members.length === 0}
+        emptyMessage="Chưa có dữ liệu hội viên nào"
+      >
                 {members.map((m) => {
-                  const linkedUser = userMap[m.user_id]
-                  const linkedPlan = planMap[m.membership_plan_id]
+                  const linkedUser = m.user || userMap[m.user_id]
+                  const linkedPlan = m.membership_plan || planMap[m.membership_plan_id]
                   return (
                     <tr key={m.id}>
-                      <td className="fw-bold text-secondary">#{m.id}</td>
-                      <td className="fw-medium">{m.full_name}</td>
-                      <td className="text-muted">{m.email}</td>
+                      <td className="identity-cell">
+                        <div className="identity-name">{m.full_name}</div>
+                        <div className="identity-email">{m.email || 'Chưa có email'}</div>
+                      </td>
                       <td>
-                        <span className="badge bg-light text-dark border">
-                          <i className="bi bi-person me-1"></i>
-                          {linkedUser ? linkedUser.email : `User #${m.user_id}`}
-                        </span>
+                        <span className="linked-value"><i className="bi bi-person"></i>{linkedUser ? linkedUser.email : `Tài khoản #${m.user_id}`}</span>
                       </td>
                       <td>
                         {linkedPlan ? (
-                          <span className="badge bg-info-subtle text-info-emphasis border">
-                            {linkedPlan.name} ({Number(linkedPlan.price).toLocaleString()}đ)
-                          </span>
+                          <span className="primary-cell">{linkedPlan.name}</span>
                         ) : (
-                          <span className="text-muted small">Chưa đăng ký</span>
+                          <span className="table-note">Chưa đăng ký</span>
                         )}
                       </td>
                       <td>
                         <StatusBadge status={m.status} />
                       </td>
                       <td className="text-end">
-                        <button className="btn btn-sm btn-outline-primary me-1" onClick={() => handleOpenEdit(m)}>
-                          <i className="bi bi-pencil"></i>
-                        </button>
-                        <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(m.id)}>
-                          <i className="bi bi-trash"></i>
-                        </button>
+                        <ActionMenu onEdit={() => handleOpenEdit(m)} onDelete={() => handleDelete(m.id)} />
                       </td>
                     </tr>
                   )
                 })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+      </ManagementTable>
 
       {showModal && (
         <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>

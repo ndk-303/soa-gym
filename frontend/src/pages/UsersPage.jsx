@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { usersApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
-import LoadingSpinner from '../components/LoadingSpinner'
+import { ActionMenu, ManagementHeader, ManagementTable } from '../components/ManagementUI'
 
 export default function UsersPage() {
   const [users, setUsers] = useState([])
@@ -23,7 +23,7 @@ export default function UsersPage() {
     fetchUsers()
   }, [])
 
-  const fetchUsers = async () => {
+  async function fetchUsers() {
     setLoading(true)
     setError(null)
     try {
@@ -95,80 +95,46 @@ export default function UsersPage() {
     }
   }
 
+  const roleLabels = { admin: 'Quản trị viên', trainer: 'Huấn luyện viên', member: 'Hội viên' }
+
   return (
     <div>
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <div>
-          <h3 className="fw-bold mb-1">
-            <i className="bi bi-people-fill text-secondary me-2"></i>
-            Quản lý Tài khoản (Users)
-          </h3>
-          <p className="text-muted small mb-0">Quản lý tài khoản đăng nhập, phân quyền (admin, trainer, member)</p>
-        </div>
-        <div className="d-flex gap-2">
-          <button className="btn btn-outline-secondary btn-sm" onClick={fetchUsers}>
-            <i className="bi bi-arrow-clockwise me-1"></i> Làm mới
-          </button>
-          <button className="btn btn-primary btn-sm" onClick={handleOpenAdd}>
-            <i className="bi bi-plus-lg me-1"></i> Thêm Tài khoản
-          </button>
-        </div>
-      </div>
+      <ManagementHeader title="Tài khoản" description="Quản lý tài khoản đăng nhập và phân quyền truy cập" onRefresh={fetchUsers} onAdd={handleOpenAdd} addLabel="Thêm tài khoản" />
 
       {error && (
-        <div className="alert alert-danger py-2 small" role="alert">
-          <i className="bi bi-exclamation-circle me-2"></i> {error}
+        <div className="management-error" role="alert">
+          <i className="bi bi-exclamation-circle me-2"></i>{error}
         </div>
       )}
 
-      <div className="card border-0 shadow-sm">
-        <div className="table-responsive">
-          {loading ? (
-            <LoadingSpinner message="Đang tải dữ liệu Users từ API..." />
-          ) : users.length === 0 ? (
-            <div className="text-center py-5 text-muted">
-              <i className="bi bi-inbox fs-1 d-block mb-2 text-secondary"></i>
-              Chưa có dữ liệu tài khoản nào
-            </div>
-          ) : (
-            <table className="table table-hover align-middle mb-0">
-              <thead className="table-light">
-                <tr>
-                  <th style={{ width: '60px' }}>ID</th>
-                  <th>Email</th>
-                  <th>Vai trò (Role)</th>
-                  <th>Trạng thái</th>
-                  <th style={{ width: '140px' }} className="text-end">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
+      <ManagementTable
+        columns={[
+          { key: 'email', label: 'Email', width: '42%' },
+          { key: 'role', label: 'Vai trò', width: '18%' },
+          { key: 'status', label: 'Trạng thái', width: '18%' },
+          { key: 'actions', label: 'Hành động', width: '190px', align: 'center' },
+        ]}
+        loading={loading}
+        loadingMessage="Đang tải dữ liệu Users từ API..."
+        isEmpty={users.length === 0}
+        emptyMessage="Chưa có dữ liệu tài khoản nào"
+        minWidth={640}
+      >
                 {users.map((u) => (
                   <tr key={u.id}>
-                    <td className="fw-bold text-secondary">#{u.id}</td>
-                    <td className="fw-medium">{u.email}</td>
+                    <td><div className="primary-cell">{u.email}</div><div className="secondary-cell">Tài khoản #{u.id}</div></td>
                     <td>
-                      <span className={`badge ${u.role === 'admin' ? 'bg-danger-subtle text-danger' : u.role === 'trainer' ? 'bg-info-subtle text-info' : 'bg-primary-subtle text-primary'}`}>
-                        {u.role}
-                      </span>
+                      <span className="semantic-badge">{roleLabels[u.role] || u.role}</span>
                     </td>
                     <td>
                       <StatusBadge status={u.is_active ? 'active' : 'inactive'} />
                     </td>
                     <td className="text-end">
-                      <button className="btn btn-sm btn-outline-primary me-1" onClick={() => handleOpenEdit(u)}>
-                        <i className="bi bi-pencil"></i>
-                      </button>
-                      <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(u.id)}>
-                        <i className="bi bi-trash"></i>
-                      </button>
+                      <ActionMenu onEdit={() => handleOpenEdit(u)} onDelete={() => handleDelete(u.id)} />
                     </td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+      </ManagementTable>
 
       {showModal && (
         <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>

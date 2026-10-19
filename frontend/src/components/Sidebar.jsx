@@ -1,30 +1,30 @@
-export default function Sidebar({ activeTab, onTabChange }) {
+export default function Sidebar({ activeTab, onTabChange, isOpen }) {
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: 'bi-speedometer2', section: 'Overview' },
-    { id: 'users', label: 'Tài khoản (Users)', icon: 'bi-people-fill', section: 'Quản lý Hội viên' },
-    { id: 'members', label: 'Hội viên (Members)', icon: 'bi-person-badge', section: 'Quản lý Hội viên' },
-    { id: 'plans', label: 'Gói tập (Plans)', icon: 'bi-card-checklist', section: 'Quản lý Hội viên' },
-    { id: 'classes', label: 'Lớp học (Classes)', icon: 'bi-calendar-event', section: 'Lớp học & Lịch tập' },
-    { id: 'slots', label: 'Ca tập (Slots)', icon: 'bi-clock-history', section: 'Lớp học & Lịch tập' },
-    { id: 'bookings', label: 'Đặt chỗ (Bookings)', icon: 'bi-bookmark-check', section: 'Lớp học & Lịch tập' },
-    { id: 'attendance', label: 'Điểm danh (Attendance)', icon: 'bi-qr-code-scan', section: 'Lớp học & Lịch tập' },
-    { id: 'invoices', label: 'Hóa đơn (Invoices)', icon: 'bi-receipt', section: 'Tài chính & Thu chi' },
-    { id: 'payments', label: 'Thanh toán (Payments)', icon: 'bi-credit-card-2-front', section: 'Tài chính & Thu chi' },
+    { id: 'dashboard', label: 'Dashboard', icon: 'bi-grid-1x2', section: 'Tổng quan' },
+    { id: 'users', label: 'Tài khoản', icon: 'bi-person', section: 'Hội viên' },
+    { id: 'members', label: 'Hội viên', icon: 'bi-people', section: 'Hội viên' },
+    { id: 'plans', label: 'Gói tập', icon: 'bi-card-list', section: 'Hội viên' },
+    { id: 'classes', label: 'Lớp học', icon: 'bi-calendar-event', section: 'Vận hành' },
+    { id: 'slots', label: 'Ca tập', icon: 'bi-clock', section: 'Vận hành' },
+    { id: 'bookings', label: 'Đặt chỗ', icon: 'bi-bookmark-check', section: 'Vận hành' },
+    { id: 'attendance', label: 'Điểm danh', icon: 'bi-qr-code-scan', section: 'Vận hành' },
+    { id: 'invoices', label: 'Hóa đơn', icon: 'bi-receipt', section: 'Tài chính' },
+    { id: 'payments', label: 'Thanh toán', icon: 'bi-credit-card', section: 'Tài chính' },
   ]
 
-  const sections = ['Overview', 'Quản lý Hội viên', 'Lớp học & Lịch tập', 'Tài chính & Thu chi']
+  const sections = ['Tổng quan', 'Hội viên', 'Vận hành', 'Tài chính']
 
   return (
-    <div className="bg-white border-end h-100 p-3 shadow-sm d-flex flex-column" style={{ width: '280px', minWidth: '280px' }}>
-      <div className="text-uppercase text-muted fw-bold small mb-2 px-2">Hệ thống Gym</div>
+    <aside className={`app-sidebar ${isOpen ? 'is-open' : ''}`}>
+      <div className="sidebar-caption">Không gian làm việc</div>
 
-      <div className="overflow-auto flex-grow-1">
+      <div className="sidebar-navigation">
         {sections.map((section) => (
-          <div key={section} className="mb-3">
-            <div className="text-secondary small fw-semibold px-2 mb-1 text-uppercase" style={{ fontSize: '0.75rem' }}>
+          <div key={section} className="sidebar-group">
+            <div className="sidebar-section-label">
               {section}
             </div>
-            <div className="list-group list-group-flush">
+            <div>
               {menuItems
                 .filter((item) => item.section === section)
                 .map((item) => {
@@ -33,15 +33,10 @@ export default function Sidebar({ activeTab, onTabChange }) {
                     <button
                       key={item.id}
                       onClick={() => onTabChange(item.id)}
-                      className={`list-group-item list-group-item-action border-0 rounded-2 py-2 px-3 d-flex align-items-center gap-2 mb-1 ${
-                        isActive
-                          ? 'active bg-primary text-white shadow-sm'
-                          : 'text-dark hover-bg-light'
-                      }`}
-                      style={{ cursor: 'pointer', transition: 'all 0.15s ease' }}
+                      className={`sidebar-link ${isActive ? 'is-active' : ''}`}
                     >
-                      <i className={`bi ${item.icon} fs-5 ${isActive ? 'text-white' : 'text-secondary'}`}></i>
-                      <span className="fw-medium text-truncate">{item.label}</span>
+                      <i className={`bi ${item.icon}`}></i>
+                      <span>{item.label}</span>
                     </button>
                   )
                 })}
@@ -49,6 +44,13 @@ export default function Sidebar({ activeTab, onTabChange }) {
           </div>
         ))}
       </div>
-    </div>
+      <div className="sidebar-footer">
+        <span className="sidebar-footer-icon"><i className="bi bi-shield-check"></i></span>
+        <div>
+          <div className="sidebar-footer-title">Khu vực quản trị</div>
+          <div className="sidebar-footer-text">Dữ liệu nội bộ</div>
+        </div>
+      </div>
+    </aside>
   )
 }

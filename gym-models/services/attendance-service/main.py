@@ -49,17 +49,11 @@ async def health():
 
 
 @app.get("/attendance")
-@app.get("/attendance/")
-@app.get("/attendances")
-@app.get("/attendances/")
 async def get_all_attendance(db: db_dependency):
     return db.query(AttendanceRecord).all()
 
 
 @app.get("/attendance/{id}")
-@app.get("/attendance/{id}/")
-@app.get("/attendances/{id}")
-@app.get("/attendances/{id}/")
 async def get_attendance(db: db_dependency, id: int):
     record = db.query(AttendanceRecord).filter(AttendanceRecord.id == id).first()
     if record is None:
@@ -68,9 +62,6 @@ async def get_attendance(db: db_dependency, id: int):
 
 
 @app.post("/attendance", status_code=status.HTTP_201_CREATED)
-@app.post("/attendance/", status_code=status.HTTP_201_CREATED)
-@app.post("/attendances", status_code=status.HTTP_201_CREATED)
-@app.post("/attendances/", status_code=status.HTTP_201_CREATED)
 async def create_attendance(db: db_dependency, attendance_request: Attendance_Request):
     record_model = AttendanceRecord(**attendance_request.dict())
     db.add(record_model)
@@ -80,9 +71,6 @@ async def create_attendance(db: db_dependency, attendance_request: Attendance_Re
 
 
 @app.put("/attendance/{id}")
-@app.put("/attendance/{id}/")
-@app.put("/attendances/{id}")
-@app.put("/attendances/{id}/")
 async def update_attendance(db: db_dependency, id: int, attendance_request: Attendance_Request):
     record = db.query(AttendanceRecord).filter(AttendanceRecord.id == id).first()
     if record is None:
@@ -99,9 +87,6 @@ async def update_attendance(db: db_dependency, id: int, attendance_request: Atte
 
 
 @app.delete("/attendance/{id}")
-@app.delete("/attendance/{id}/")
-@app.delete("/attendances/{id}")
-@app.delete("/attendances/{id}/")
 async def delete_attendance(db: db_dependency, id: int):
     record = db.query(AttendanceRecord).filter(AttendanceRecord.id == id).first()
     if record is None:

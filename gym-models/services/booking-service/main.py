@@ -49,13 +49,11 @@ async def health():
 
 
 @app.get("/bookings")
-@app.get("/bookings/")
 async def get_all_bookings(db: db_dependency):
     return db.query(Booking).all()
 
 
 @app.get("/bookings/{id}")
-@app.get("/bookings/{id}/")
 async def get_booking(db: db_dependency, id: int):
     booking = db.query(Booking).filter(Booking.id == id).first()
     if booking is None:
@@ -64,7 +62,6 @@ async def get_booking(db: db_dependency, id: int):
 
 
 @app.post("/bookings", status_code=status.HTTP_201_CREATED)
-@app.post("/bookings/", status_code=status.HTTP_201_CREATED)
 async def create_booking(db: db_dependency, booking_request: Booking_Request):
     booking_model = Booking(**booking_request.dict())
     db.add(booking_model)
@@ -74,7 +71,6 @@ async def create_booking(db: db_dependency, booking_request: Booking_Request):
 
 
 @app.put("/bookings/{id}")
-@app.put("/bookings/{id}/")
 async def update_booking(db: db_dependency, id: int, booking_request: Booking_Request):
     booking = db.query(Booking).filter(Booking.id == id).first()
     if booking is None:
@@ -90,7 +86,6 @@ async def update_booking(db: db_dependency, id: int, booking_request: Booking_Re
 
 
 @app.delete("/bookings/{id}")
-@app.delete("/bookings/{id}/")
 async def delete_booking(db: db_dependency, id: int):
     booking = db.query(Booking).filter(Booking.id == id).first()
     if booking is None:

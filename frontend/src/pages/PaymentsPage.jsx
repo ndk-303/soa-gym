@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { paymentsApi, invoicesApi, membersApi } from '../services/api'
-import LoadingSpinner from '../components/LoadingSpinner'
+import { ActionMenu, ManagementHeader, ManagementTable } from '../components/ManagementUI'
+import { formatVnd } from '../components/managementUtils'
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState([])
@@ -24,12 +25,12 @@ export default function PaymentsPage() {
     fetchData()
   }, [])
 
-  const fetchData = async () => {
+  async function fetchData() {
     setLoading(true)
     setError(null)
     try {
       const [paymentsRes, invoicesRes, membersRes] = await Promise.all([
-        paymentsApi.getAll(),
+        paymentsApi.getDetailed(),
         invoicesApi.getAll(),
         membersApi.getAll(),
       ])
@@ -123,88 +124,51 @@ export default function PaymentsPage() {
 
   return (
     <div>
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <div>
-          <h3 className="fw-bold mb-1">
-            <i className="bi bi-credit-card-2-front text-secondary me-2"></i>
-            Quản lý Thanh toán (Payments)
-          </h3>
-          <p className="text-muted small mb-0">Lịch sử thu tiền thanh toán hóa đơn (tiền mặt, thẻ, chuyển khoản...)</p>
-        </div>
-        <div className="d-flex gap-2">
-          <button className="btn btn-outline-secondary btn-sm" onClick={fetchData}>
-            <i className="bi bi-arrow-clockwise me-1"></i> Làm mới
-          </button>
-          <button className="btn btn-primary btn-sm" onClick={handleOpenAdd}>
-            <i className="bi bi-plus-lg me-1"></i> Ghi nhận Thanh toán
-          </button>
-        </div>
-      </div>
+      <ManagementHeader title="Thanh toán" description="Lịch sử thu tiền và phương thức thanh toán theo từng hóa đơn" onRefresh={fetchData} onAdd={handleOpenAdd} addLabel="Ghi nhận thanh toán" />
 
       {error && (
-        <div className="alert alert-danger py-2 small" role="alert">
+        <div className="management-error" role="alert">
           <i className="bi bi-exclamation-circle me-2"></i> {error}
         </div>
       )}
 
-      <div className="card border-0 shadow-sm">
-        <div className="table-responsive">
-          {loading ? (
-            <LoadingSpinner message="Đang tải dữ liệu Thanh toán..." />
-          ) : payments.length === 0 ? (
-            <div className="text-center py-5 text-muted">
-              <i className="bi bi-inbox fs-1 d-block mb-2 text-secondary"></i>
-              Chưa có dữ liệu thanh toán nào
-            </div>
-          ) : (
-            <table className="table table-hover align-middle mb-0">
-              <thead className="table-light">
-                <tr>
-                  <th style={{ width: '60px' }}>ID</th>
-                  <th>Hóa đơn & Hội viên</th>
-                  <th>Số tiền thanh toán</th>
-                  <th>Phương thức</th>
-                  <th>Ghi chú</th>
-                  <th style={{ width: '140px' }} className="text-end">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
+      <ManagementTable
+        columns={[
+          { key: 'payment', label: 'Mã giao dịch', width: '21%' },
+          { key: 'invoice', label: 'Hóa đơn / Hội viên', width: '21%' },
+          { key: 'amount', label: 'Số tiền', width: '15%', align: 'right' },
+          { key: 'method', label: 'Phương thức', width: '15%' },
+          { key: 'notes', label: 'Ghi chú', width: '13%' },
+          { key: 'actions', label: 'Hành động', width: '190px', align: 'center' },
+        ]}
+        loading={loading}
+        loadingMessage="Đang tải dữ liệu Thanh toán..."
+        isEmpty={payments.length === 0}
+        emptyMessage="Chưa có dữ liệu thanh toán nào"
+        minWidth={900}
+      >
                 {payments.map((p) => {
-                  const linkedInv = invoiceMap[p.invoice_id]
-                  const linkedMember = linkedInv ? memberMap[linkedInv.member_id] : null
+                  const linkedInv = p.invoice || invoiceMap[p.invoice_id]
+                  const linkedMember = p.member || linkedInv?.member || (linkedInv ? memberMap[linkedInv.member_id] : null)
                   return (
                     <tr key={p.id}>
-                      <td className="fw-bold text-secondary">#{p.id}</td>
+                      <td><span className="technical-id">GD #{p.id}</span></td>
                       <td>
-                        <span className="badge bg-secondary-subtle text-secondary-emphasis border">
-                          <i className="bi bi-receipt me-1"></i>
-                          Hóa đơn #{p.invoice_id}
-                          {linkedMember ? ` - [${linkedMember.full_name}]` : ''}
-                        </span>
+                        <div className="primary-cell">Hóa đơn #{p.invoice_id}</div>
+                        <div className="secondary-cell">{linkedMember ? linkedMember.full_name : `Hội viên #${linkedInv?.member_id || '—'}`}</div>
                       </td>
-                      <td className="fw-bold text-success">+{Number(p.amount).toLocaleString()} đ</td>
+                      <td className="money">{formatVnd(p.amount)}</td>
                       <td>
-                        <span className="badge bg-light text-dark border text-uppercase">
-                          <i className="bi bi-cash me-1"></i> {p.payment_method}
-                        </span>
+                        <span className="semantic-badge">{({ cash: 'Tiền mặt', bank_transfer: 'Chuyển khoản', vietqr: 'VietQR', credit_card: 'Thẻ tín dụng' })[p.payment_method] || p.payment_method}</span>
                       </td>
-                      <td className="text-muted small">{p.notes || '-'}</td>
+                      <td className="table-note">{p.notes || '—'}</td>
                       <td className="text-end">
-                        <button className="btn btn-sm btn-outline-primary me-1" onClick={() => handleOpenEdit(p)}>
-                          <i className="bi bi-pencil"></i>
-                        </button>
-                        <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(p.id)}>
-                          <i className="bi bi-trash"></i>
-                        </button>
+                        <ActionMenu onEdit={() => handleOpenEdit(p)} onDelete={() => handleDelete(p.id)} />
                       </td>
                     </tr>
                   )
                 })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+      </ManagementTable>
 
       {showModal && (
         <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>

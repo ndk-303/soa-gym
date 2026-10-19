@@ -133,3 +133,59 @@ def test_crud_through_gateway(run_all_services):
         # Delete
         res_del = client.delete(f"/users/{u_id}")
         assert res_del.status_code == 200
+
+
+def test_composite_aggregation_routes(run_all_services):
+    base_url = run_all_services
+    with httpx.Client(base_url=base_url) as client:
+        # Check all 7 composite routes return 200 OK and populated objects
+        r_bookings = client.get("/api/composite/bookings")
+        assert r_bookings.status_code == 200
+        bookings = r_bookings.json()
+        assert isinstance(bookings, list)
+        if len(bookings) > 0:
+            assert "member" in bookings[0]
+            assert "slot" in bookings[0]
+
+        r_invoices = client.get("/api/composite/invoices")
+        assert r_invoices.status_code == 200
+        invoices = r_invoices.json()
+        assert isinstance(invoices, list)
+        if len(invoices) > 0:
+            assert "member" in invoices[0]
+
+        r_payments = client.get("/api/composite/payments")
+        assert r_payments.status_code == 200
+        payments = r_payments.json()
+        assert isinstance(payments, list)
+        if len(payments) > 0:
+            assert "invoice" in payments[0]
+
+        r_attendance = client.get("/api/composite/attendance")
+        assert r_attendance.status_code == 200
+        attendance = r_attendance.json()
+        assert isinstance(attendance, list)
+        if len(attendance) > 0:
+            assert "member" in attendance[0]
+
+        r_classes = client.get("/api/composite/classes")
+        assert r_classes.status_code == 200
+        classes = r_classes.json()
+        assert isinstance(classes, list)
+        if len(classes) > 0:
+            assert "trainer" in classes[0]
+
+        r_members = client.get("/api/composite/members")
+        assert r_members.status_code == 200
+        members = r_members.json()
+        assert isinstance(members, list)
+        if len(members) > 0:
+            assert "user" in members[0]
+
+        r_slots = client.get("/api/composite/slots")
+        assert r_slots.status_code == 200
+        slots = r_slots.json()
+        assert isinstance(slots, list)
+        if len(slots) > 0:
+            assert "class" in slots[0]
+

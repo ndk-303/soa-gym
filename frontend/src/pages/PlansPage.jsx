@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { plansApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
-import LoadingSpinner from '../components/LoadingSpinner'
+import { ActionMenu, ManagementHeader, ManagementTable } from '../components/ManagementUI'
+import { formatVnd } from '../components/managementUtils'
 
 export default function PlansPage() {
   const [plans, setPlans] = useState([])
@@ -23,7 +24,7 @@ export default function PlansPage() {
     fetchPlans()
   }, [])
 
-  const fetchPlans = async () => {
+  async function fetchPlans() {
     setLoading(true)
     setError(null)
     try {
@@ -103,76 +104,41 @@ export default function PlansPage() {
 
   return (
     <div>
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <div>
-          <h3 className="fw-bold mb-1">
-            <i className="bi bi-card-checklist text-secondary me-2"></i>
-            Quản lý Gói tập (Membership Plans)
-          </h3>
-          <p className="text-muted small mb-0">Các gói thành viên theo thời hạn (30 ngày, 90 ngày, 365 ngày...)</p>
-        </div>
-        <div className="d-flex gap-2">
-          <button className="btn btn-outline-secondary btn-sm" onClick={fetchPlans}>
-            <i className="bi bi-arrow-clockwise me-1"></i> Làm mới
-          </button>
-          <button className="btn btn-primary btn-sm" onClick={handleOpenAdd}>
-            <i className="bi bi-plus-lg me-1"></i> Thêm Gói tập
-          </button>
-        </div>
-      </div>
+      <ManagementHeader title="Gói tập" description="Quản lý thời hạn và mức giá các gói thành viên" onRefresh={fetchPlans} onAdd={handleOpenAdd} addLabel="Thêm gói tập" />
 
       {error && (
-        <div className="alert alert-danger py-2 small" role="alert">
+        <div className="management-error" role="alert">
           <i className="bi bi-exclamation-circle me-2"></i> {error}
         </div>
       )}
 
-      <div className="card border-0 shadow-sm">
-        <div className="table-responsive">
-          {loading ? (
-            <LoadingSpinner message="Đang tải dữ liệu Gói tập..." />
-          ) : plans.length === 0 ? (
-            <div className="text-center py-5 text-muted">
-              <i className="bi bi-inbox fs-1 d-block mb-2 text-secondary"></i>
-              Chưa có dữ liệu gói tập nào
-            </div>
-          ) : (
-            <table className="table table-hover align-middle mb-0">
-              <thead className="table-light">
-                <tr>
-                  <th style={{ width: '60px' }}>ID</th>
-                  <th>Tên gói tập</th>
-                  <th>Thời hạn (Ngày)</th>
-                  <th>Giá tiền (VNĐ)</th>
-                  <th>Trạng thái</th>
-                  <th style={{ width: '140px' }} className="text-end">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
+      <ManagementTable
+        columns={[
+          { key: 'name', label: 'Tên gói tập', width: '34%' },
+          { key: 'duration', label: 'Thời hạn', width: '17%' },
+          { key: 'price', label: 'Giá', width: '18%', align: 'right' },
+          { key: 'status', label: 'Trạng thái', width: '16%' },
+          { key: 'actions', label: 'Hành động', width: '190px', align: 'center' },
+        ]}
+        loading={loading}
+        loadingMessage="Đang tải dữ liệu Gói tập..."
+        isEmpty={plans.length === 0}
+        emptyMessage="Chưa có dữ liệu gói tập nào"
+      >
                 {plans.map((p) => (
                   <tr key={p.id}>
-                    <td className="fw-bold text-secondary">#{p.id}</td>
-                    <td className="fw-bold text-primary">{p.name}</td>
+                    <td><div className="primary-cell">{p.name}</div><div className="secondary-cell">Gói #{p.id}</div></td>
                     <td>{p.duration_days} ngày</td>
-                    <td className="fw-semibold text-success">{Number(p.price).toLocaleString()} đ</td>
+                    <td className="money">{formatVnd(p.price)}</td>
                     <td>
                       <StatusBadge status={p.is_active ? 'active' : 'inactive'} />
                     </td>
                     <td className="text-end">
-                      <button className="btn btn-sm btn-outline-primary me-1" onClick={() => handleOpenEdit(p)}>
-                        <i className="bi bi-pencil"></i>
-                      </button>
-                      <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(p.id)}>
-                        <i className="bi bi-trash"></i>
-                      </button>
+                      <ActionMenu onEdit={() => handleOpenEdit(p)} onDelete={() => handleDelete(p.id)} />
                     </td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+      </ManagementTable>
 
       {showModal && (
         <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>

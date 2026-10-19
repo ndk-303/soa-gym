@@ -14,6 +14,12 @@ import PaymentsPage from './pages/PaymentsPage'
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab)
+    setSidebarOpen(false)
+  }
 
   const renderContent = () => {
     switch (activeTab) {
@@ -43,14 +49,15 @@ export default function App() {
   }
 
   return (
-    <div className="d-flex flex-column vh-100 bg-light">
-      <Navbar activeTab={activeTab} onTabChange={setActiveTab} />
-      
-      <div className="d-flex flex-grow-1 overflow-hidden">
-        <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
-        
-        <main className="flex-grow-1 overflow-auto p-4">
-          <div className="container-fluid" style={{ maxWidth: '1400px' }}>
+    <div className="app-shell">
+      <Navbar activeTab={activeTab} onMenuToggle={() => setSidebarOpen((open) => !open)} />
+
+      <div className="app-body">
+        <Sidebar activeTab={activeTab} onTabChange={handleTabChange} isOpen={sidebarOpen} />
+        {sidebarOpen && <button className="sidebar-backdrop" aria-label="Đóng menu" onClick={() => setSidebarOpen(false)} />}
+
+        <main className="app-main">
+          <div className="app-content">
             {renderContent()}
           </div>
         </main>

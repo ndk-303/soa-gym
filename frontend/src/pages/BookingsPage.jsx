@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { bookingsApi, membersApi, slotsApi, classesApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
-import LoadingSpinner from '../components/LoadingSpinner'
+import { ActionMenu, ManagementHeader, ManagementTable } from '../components/ManagementUI'
+import { formatSchedule } from '../components/managementUtils'
 
 export default function BookingsPage() {
   const [bookings, setBookings] = useState([])
@@ -26,12 +27,12 @@ export default function BookingsPage() {
     fetchData()
   }, [])
 
-  const fetchData = async () => {
+  async function fetchData() {
     setLoading(true)
     setError(null)
     try {
       const [bookingsRes, membersRes, slotsRes, classesRes] = await Promise.all([
-        bookingsApi.getAll(),
+        bookingsApi.getDetailed(),
         membersApi.getAll(),
         slotsApi.getAll(),
         classesApi.getAll(),
@@ -118,92 +119,52 @@ export default function BookingsPage() {
 
   return (
     <div>
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <div>
-          <h3 className="fw-bold mb-1">
-            <i className="bi bi-bookmark-check text-secondary me-2"></i>
-            Quản lý Đặt chỗ (Bookings)
-          </h3>
-          <p className="text-muted small mb-0">Hội viên đăng ký tham gia ca tập, quản lý danh sách chờ (Waitlist)</p>
-        </div>
-        <div className="d-flex gap-2">
-          <button className="btn btn-outline-secondary btn-sm" onClick={fetchData}>
-            <i className="bi bi-arrow-clockwise me-1"></i> Làm mới
-          </button>
-          <button className="btn btn-primary btn-sm" onClick={handleOpenAdd}>
-            <i className="bi bi-plus-lg me-1"></i> Đặt chỗ mới
-          </button>
-        </div>
-      </div>
+      <ManagementHeader title="Đặt chỗ" description="Theo dõi đăng ký lớp học và danh sách chờ của hội viên" onRefresh={fetchData} onAdd={handleOpenAdd} addLabel="Đặt chỗ mới" />
 
       {error && (
-        <div className="alert alert-danger py-2 small" role="alert">
+        <div className="management-error" role="alert">
           <i className="bi bi-exclamation-circle me-2"></i> {error}
         </div>
       )}
 
-      <div className="card border-0 shadow-sm">
-        <div className="table-responsive">
-          {loading ? (
-            <LoadingSpinner message="Đang tải dữ liệu Đặt chỗ..." />
-          ) : bookings.length === 0 ? (
-            <div className="text-center py-5 text-muted">
-              <i className="bi bi-inbox fs-1 d-block mb-2 text-secondary"></i>
-              Chưa có dữ liệu đặt chỗ nào
-            </div>
-          ) : (
-            <table className="table table-hover align-middle mb-0">
-              <thead className="table-light">
-                <tr>
-                  <th style={{ width: '60px' }}>ID</th>
-                  <th>Hội viên</th>
-                  <th>Ca tập & Lớp học</th>
-                  <th>Hàng chờ (Waitlist Pos)</th>
-                  <th>Trạng thái</th>
-                  <th style={{ width: '140px' }} className="text-end">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
+      <ManagementTable
+        columns={[
+          { key: 'member', label: 'Hội viên', width: '28%' },
+          { key: 'class', label: 'Lớp học / Ca tập', width: '18%' },
+          { key: 'waitlist', label: 'Vị trí chờ', width: '19%' },
+          { key: 'status', label: 'Trạng thái', width: '15%' },
+          { key: 'actions', label: 'Hành động', width: '190px', align: 'center' },
+        ]}
+        loading={loading}
+        loadingMessage="Đang tải dữ liệu Đặt chỗ..."
+        isEmpty={bookings.length === 0}
+        emptyMessage="Chưa có dữ liệu đặt chỗ nào"
+      >
                 {bookings.map((b) => {
-                  const member = memberMap[b.member_id]
-                  const slot = slotMap[b.slot_id]
-                  const gymClass = slot ? classMap[slot.class_id] : null
+                  const member = b.member || memberMap[b.member_id]
+                  const slot = b.slot || slotMap[b.slot_id]
+                  const gymClass = slot?.class || (slot ? classMap[slot.class_id] : null)
                   return (
                     <tr key={b.id}>
-                      <td className="fw-bold text-secondary">#{b.id}</td>
                       <td>
-                        <span className="badge bg-success-subtle text-success-emphasis border">
-                          <i className="bi bi-person me-1"></i>
-                          {member ? `${member.full_name} (${member.email})` : `Hội viên #${b.member_id}`}
-                        </span>
+                        <div className="primary-cell">{member ? member.full_name : `Hội viên #${b.member_id}`}</div>
+                        <div className="secondary-cell">{member?.email || `Đặt chỗ #${b.id}`}</div>
                       </td>
                       <td>
-                        <span className="badge bg-primary-subtle text-primary border">
-                          <i className="bi bi-clock me-1"></i>
-                          {slot ? `${slot.start_time}` : `Ca #${b.slot_id}`}
-                          {gymClass ? ` - [${gymClass.name}]` : ''}
-                        </span>
+                        <div className="primary-cell">{gymClass ? gymClass.name : `Ca #${b.slot_id}`}</div>
+                        <div className="secondary-cell">{slot ? (() => { const schedule = formatSchedule(slot.start_time); return `${schedule.date} · ${schedule.time}` })() : 'Chưa có lịch'}</div>
                       </td>
-                      <td>{b.waitlist_position ? <span className="badge bg-warning text-dark">Thứ hạng: {b.waitlist_position}</span> : <span className="text-muted small">-</span>}</td>
+                      <td>{b.waitlist_position ? <span className="waitlist-value">#{b.waitlist_position}</span> : <span className="table-note">—</span>}</td>
                       <td>
                         <StatusBadge status={b.status} />
                       </td>
                       <td className="text-end">
-                        <button className="btn btn-sm btn-outline-primary me-1" onClick={() => handleOpenEdit(b)}>
-                          <i className="bi bi-pencil"></i>
-                        </button>
-                        <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(b.id)}>
-                          <i className="bi bi-trash"></i>
-                        </button>
+                        <ActionMenu onEdit={() => handleOpenEdit(b)} onDelete={() => handleDelete(b.id)} deleteLabel="Xóa đặt chỗ" />
                       </td>
                     </tr>
                   )
                 })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+      </ManagementTable>
 
       {showModal && (
         <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>

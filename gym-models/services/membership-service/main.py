@@ -59,13 +59,11 @@ async def health():
 # ==================== Membership Plans Endpoints ====================
 
 @app.get("/membership-plans")
-@app.get("/membership-plans/")
 async def get_all_plans(db: db_dependency):
     return db.query(MembershipPlan).all()
 
 
 @app.get("/membership-plans/{id}")
-@app.get("/membership-plans/{id}/")
 async def get_plan(db: db_dependency, id: int):
     plan = db.query(MembershipPlan).filter(MembershipPlan.id == id).first()
     if plan is None:
@@ -74,7 +72,6 @@ async def get_plan(db: db_dependency, id: int):
 
 
 @app.post("/membership-plans", status_code=status.HTTP_201_CREATED)
-@app.post("/membership-plans/", status_code=status.HTTP_201_CREATED)
 async def create_plan(db: db_dependency, plan_request: MembershipPlan_Request):
     plan_model = MembershipPlan(**plan_request.dict())
     db.add(plan_model)
@@ -84,7 +81,6 @@ async def create_plan(db: db_dependency, plan_request: MembershipPlan_Request):
 
 
 @app.put("/membership-plans/{id}")
-@app.put("/membership-plans/{id}/")
 async def update_plan(db: db_dependency, id: int, plan_request: MembershipPlan_Request):
     plan = db.query(MembershipPlan).filter(MembershipPlan.id == id).first()
     if plan is None:
@@ -100,7 +96,6 @@ async def update_plan(db: db_dependency, id: int, plan_request: MembershipPlan_R
 
 
 @app.delete("/membership-plans/{id}")
-@app.delete("/membership-plans/{id}/")
 async def delete_plan(db: db_dependency, id: int):
     plan = db.query(MembershipPlan).filter(MembershipPlan.id == id).first()
     if plan is None:
@@ -113,13 +108,11 @@ async def delete_plan(db: db_dependency, id: int):
 # ==================== Members Endpoints ====================
 
 @app.get("/members")
-@app.get("/members/")
 async def get_all_members(db: db_dependency):
     return db.query(Member).all()
 
 
 @app.get("/members/{id}")
-@app.get("/members/{id}/")
 async def get_member(db: db_dependency, id: int):
     member = db.query(Member).filter(Member.id == id).first()
     if member is None:
@@ -128,7 +121,6 @@ async def get_member(db: db_dependency, id: int):
 
 
 @app.post("/members", status_code=status.HTTP_201_CREATED)
-@app.post("/members/", status_code=status.HTTP_201_CREATED)
 async def create_member(db: db_dependency, member_request: Member_Request):
     member_model = Member(**member_request.dict())
     db.add(member_model)
@@ -138,7 +130,6 @@ async def create_member(db: db_dependency, member_request: Member_Request):
 
 
 @app.put("/members/{id}")
-@app.put("/members/{id}/")
 async def update_member(db: db_dependency, id: int, member_request: Member_Request):
     member = db.query(Member).filter(Member.id == id).first()
     if member is None:
@@ -155,7 +146,6 @@ async def update_member(db: db_dependency, id: int, member_request: Member_Reque
 
 
 @app.delete("/members/{id}")
-@app.delete("/members/{id}/")
 async def delete_member(db: db_dependency, id: int):
     member = db.query(Member).filter(Member.id == id).first()
     if member is None:

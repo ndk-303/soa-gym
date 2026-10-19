@@ -52,13 +52,11 @@ async def health():
 
 
 @app.get("/users")
-@app.get("/users/")
 async def get_all_users(db: db_dependency):
     return db.query(User).all()
 
 
 @app.get("/users/{id}")
-@app.get("/users/{id}/")
 async def get_user(db: db_dependency, id: int):
     user = db.query(User).filter(User.id == id).first()
     if user is None:
@@ -67,7 +65,6 @@ async def get_user(db: db_dependency, id: int):
 
 
 @app.post("/users", status_code=status.HTTP_201_CREATED)
-@app.post("/users/", status_code=status.HTTP_201_CREATED)
 async def create_user(db: db_dependency, user_request: User_Request):
     user_model = User(**user_request.dict())
     db.add(user_model)
@@ -77,7 +74,6 @@ async def create_user(db: db_dependency, user_request: User_Request):
 
 
 @app.put("/users/{id}")
-@app.put("/users/{id}/")
 async def update_user(db: db_dependency, id: int, user_request: User_Request):
     user = db.query(User).filter(User.id == id).first()
     if user is None:
@@ -93,7 +89,6 @@ async def update_user(db: db_dependency, id: int, user_request: User_Request):
 
 
 @app.delete("/users/{id}")
-@app.delete("/users/{id}/")
 async def delete_user(db: db_dependency, id: int):
     user = db.query(User).filter(User.id == id).first()
     if user is None:
