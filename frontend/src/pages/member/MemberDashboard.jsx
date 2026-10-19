@@ -138,17 +138,19 @@ export default function MemberDashboard({ onTabChange, currentMember, memberLoad
 
       {/* No Plan Alert Banner */}
       {!currentPlan && !loading && (
-        <div className="alert alert-info d-flex align-items-center justify-content-between p-3 rounded-3 mb-4 shadow-sm border-0">
-          <div className="d-flex align-items-center gap-3">
-            <i className="bi bi-info-circle-fill text-primary fs-4"></i>
+        <div className="member-banner">
+          <div className="member-banner-content">
+            <span className="member-banner-icon">
+              <i className="bi bi-info-circle-fill"></i>
+            </span>
             <div>
-              <div className="fw-bold text-dark">Bạn chưa đăng ký gói tập nào</div>
-              <div className="small text-muted">Hãy đăng ký một gói tập để bắt đầu sử dụng phòng tập và tham gia các lớp học.</div>
+              <div className="member-banner-title">Bạn chưa đăng ký gói tập nào</div>
+              <div className="member-banner-text">Hãy đăng ký một gói tập để bắt đầu sử dụng phòng tập và tham gia các lớp học.</div>
             </div>
           </div>
           <button
             type="button"
-            className="btn btn-primary btn-sm px-3 fw-bold rounded-2"
+            className="management-primary-button"
             onClick={() => onTabChange('plans')}
           >
             Đăng ký gói tập <i className="bi bi-arrow-right ms-1"></i>
@@ -159,7 +161,7 @@ export default function MemberDashboard({ onTabChange, currentMember, memberLoad
       {/* 4 Metric Cards */}
       <div className="kpi-grid">
         {/* Card 1: Gói tập hiện tại */}
-        <div className="kpi-card" onClick={() => onTabChange('plans')}>
+        <div className="kpi-card" onClick={() => onTabChange('plans')} role="button" tabIndex={0}>
           <div className="kpi-card-top">
             <span className="kpi-icon"><i className="bi bi-card-checklist"></i></span>
             <span className="kpi-group-tag">Thẻ hội viên</span>
@@ -182,7 +184,7 @@ export default function MemberDashboard({ onTabChange, currentMember, memberLoad
             <span className="kpi-group-tag">Check-in</span>
           </div>
           <div>
-            <div className="kpi-card-value text-success">
+            <div className="kpi-card-value" style={{ color: 'var(--color-success)' }}>
               {loading ? <span className="kpi-skeleton"></span> : `${uniqueAttendanceDays} ngày`}
             </div>
             <div className="kpi-card-label">
@@ -198,7 +200,10 @@ export default function MemberDashboard({ onTabChange, currentMember, memberLoad
             <span className="kpi-group-tag">Hiệu lực</span>
           </div>
           <div>
-            <div className={`kpi-card-value ${isPendingWarning ? 'text-warning' : 'text-primary'}`}>
+            <div
+              className="kpi-card-value"
+              style={{ color: isPendingWarning ? 'var(--color-warning)' : 'var(--color-primary)' }}
+            >
               {loading ? (
                 <span className="kpi-skeleton"></span>
               ) : currentPlan ? (

@@ -56,21 +56,29 @@ export default function MemberHistoryPage({ currentMember }) {
       )}
 
       {/* Summary Highlights */}
-      <div className="row g-3 mb-4">
-        <div className="col-12 col-sm-6 col-md-4">
-          <div className="kpi-card p-3">
-            <div className="small text-secondary fw-semibold">Tổng chi tiêu thành công</div>
-            <div className="h4 fw-bold text-primary mt-2 mb-0" style={{ fontVariantNumeric: 'tabular-nums' }}>
+      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+        <div className="kpi-card">
+          <div className="kpi-card-top">
+            <span className="kpi-icon"><i className="bi bi-wallet2"></i></span>
+            <span className="kpi-group-tag">Chi tiêu</span>
+          </div>
+          <div>
+            <div className="kpi-card-value" style={{ color: 'var(--color-primary)' }}>
               {formatVnd(totalSpent)}
             </div>
+            <div className="kpi-card-label">Tổng chi tiêu thành công</div>
           </div>
         </div>
-        <div className="col-12 col-sm-6 col-md-4">
-          <div className="kpi-card p-3">
-            <div className="small text-secondary fw-semibold">Tổng số giao dịch</div>
-            <div className="h4 fw-bold text-dark mt-2 mb-0" style={{ fontVariantNumeric: 'tabular-nums' }}>
+        <div className="kpi-card">
+          <div className="kpi-card-top">
+            <span className="kpi-icon"><i className="bi bi-receipt"></i></span>
+            <span className="kpi-group-tag">Giao dịch</span>
+          </div>
+          <div>
+            <div className="kpi-card-value">
               {invoices.length} hóa đơn
             </div>
+            <div className="kpi-card-label">Tổng số giao dịch</div>
           </div>
         </div>
       </div>
@@ -111,7 +119,7 @@ export default function MemberHistoryPage({ currentMember }) {
                       <span className="money">{formatVnd(inv.amount)}</span>
                     </td>
                     <td className="text-end">
-                      <span className="money text-success">{formatVnd(inv.amount_paid || (inv.status === 'paid' ? inv.amount : 0))}</span>
+                      <span className="money is-success">{formatVnd(inv.amount_paid || (inv.status === 'paid' ? inv.amount : 0))}</span>
                     </td>
                     <td>
                       <StatusBadge status={inv.status} />

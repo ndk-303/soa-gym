@@ -199,6 +199,16 @@
   font-size: 14px;
 }
 
+.sidebar-footer-icon.is-admin {
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.sidebar-footer-icon.is-member {
+  color: var(--color-success);
+  background: var(--color-success-bg);
+}
+
 .sidebar-footer-title {
   color: var(--text-primary);
   font-size: 12.5px;

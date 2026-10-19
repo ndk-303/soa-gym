@@ -109,8 +109,8 @@ export default function AttendanceCalendar({ checkInRecords = [] }) {
       <div className="calendar-header">
         <div className="calendar-title-group">
           <h3 className="calendar-month-title">
-            <i className="bi bi-calendar3 me-2 text-primary"></i>
-            {monthTitle}
+            <i className="bi bi-calendar3"></i>
+            <span>{monthTitle}</span>
           </h3>
           <span className="calendar-stat-tag">
             <i className="bi bi-check-circle-fill"></i>

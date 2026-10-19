@@ -59,8 +59,8 @@ export default function Sidebar({ activeTab, onTabChange, isOpen }) {
       </div>
 
       <div className="sidebar-footer">
-        <span className="sidebar-footer-icon">
-          <i className={`bi ${isAdmin ? 'bi-shield-check text-primary' : 'bi-person-badge text-success'}`}></i>
+        <span className={`sidebar-footer-icon ${isAdmin ? 'is-admin' : 'is-member'}`}>
+          <i className={`bi ${isAdmin ? 'bi-shield-check' : 'bi-person-badge'}`}></i>
         </span>
         <div>
           <div className="sidebar-footer-title">
