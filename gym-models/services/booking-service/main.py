@@ -14,12 +14,13 @@ import models
 from models import Booking
 from schemas import Booking_Request
 from database import engine, SessionLocal, get_db
+from config import settings
 
 app = FastAPI(title="Booking Service - Gym SOA", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -97,4 +98,4 @@ async def delete_booking(db: db_dependency, id: int):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8004, reload=True)
+    uvicorn.run("main:app", host=settings.HOST, port=settings.service_port, reload=settings.ENVIRONMENT == "development")

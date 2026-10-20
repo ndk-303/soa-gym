@@ -18,10 +18,11 @@ import models
 from models import User
 from schemas import User_Request, Login_Request
 from database import engine, SessionLocal, get_db
+from config import settings
 
-SECRET_KEY = "gym_soa_jwt_secret_key_super_secure_32bytes_min"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_HOURS = 24
+SECRET_KEY = settings.JWT_SECRET_KEY
+ALGORITHM = settings.JWT_ALGORITHM
+ACCESS_TOKEN_EXPIRE_HOURS = settings.ACCESS_TOKEN_EXPIRE_HOURS
 
 pwd_context = PasswordHash.recommended()
 
@@ -40,7 +41,7 @@ app = FastAPI(title="User Service - Gym SOA", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -164,4 +165,4 @@ async def delete_user(db: db_dependency, id: int):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)
+    uvicorn.run("main:app", host=settings.HOST, port=settings.service_port, reload=settings.ENVIRONMENT == "development")

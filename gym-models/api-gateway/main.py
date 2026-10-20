@@ -13,6 +13,7 @@ if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
 from config import (
+    settings,
     SERVICE_MAP,
     USER_SERVICE_URL,
     MEMBERSHIP_SERVICE_URL,
@@ -29,7 +30,7 @@ http_client: Optional[httpx.AsyncClient] = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global http_client
-    http_client = httpx.AsyncClient(timeout=10.0)
+    http_client = httpx.AsyncClient(timeout=settings.GATEWAY_HTTP_TIMEOUT)
     yield
     if http_client:
         await http_client.aclose()
@@ -44,7 +45,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -401,4 +402,4 @@ async def reverse_proxy(full_path: str, request: Request):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host=settings.GATEWAY_HOST, port=settings.GATEWAY_PORT, reload=settings.ENVIRONMENT == "development")

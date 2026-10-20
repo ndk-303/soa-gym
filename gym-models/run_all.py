@@ -4,43 +4,51 @@ import time
 import signal
 import subprocess
 from typing import List
+from dotenv import load_dotenv
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Preload .env from gym-models/.env or workspace root
+env_path = os.path.join(BASE_DIR, ".env")
+if os.path.exists(env_path):
+    load_dotenv(dotenv_path=env_path)
+else:
+    load_dotenv()
 
 SERVICES = [
     {
         "name": "user-service",
-        "port": 8001,
+        "port": int(os.getenv("USER_SERVICE_PORT", 8001)),
         "dir": os.path.join(BASE_DIR, "services", "user-service"),
     },
     {
         "name": "membership-service",
-        "port": 8002,
+        "port": int(os.getenv("MEMBERSHIP_SERVICE_PORT", 8002)),
         "dir": os.path.join(BASE_DIR, "services", "membership-service"),
     },
     {
         "name": "class-service",
-        "port": 8003,
+        "port": int(os.getenv("CLASS_SERVICE_PORT", 8003)),
         "dir": os.path.join(BASE_DIR, "services", "class-service"),
     },
     {
         "name": "booking-service",
-        "port": 8004,
+        "port": int(os.getenv("BOOKING_SERVICE_PORT", 8004)),
         "dir": os.path.join(BASE_DIR, "services", "booking-service"),
     },
     {
         "name": "billing-service",
-        "port": 8005,
+        "port": int(os.getenv("BILLING_SERVICE_PORT", 8005)),
         "dir": os.path.join(BASE_DIR, "services", "billing-service"),
     },
     {
         "name": "attendance-service",
-        "port": 8006,
+        "port": int(os.getenv("ATTENDANCE_SERVICE_PORT", 8006)),
         "dir": os.path.join(BASE_DIR, "services", "attendance-service"),
     },
     {
         "name": "api-gateway",
-        "port": 8000,
+        "port": int(os.getenv("GATEWAY_PORT", 8000)),
         "dir": os.path.join(BASE_DIR, "api-gateway"),
     },
 ]
@@ -82,6 +90,11 @@ def main():
     print("=" * 70)
 
     python_exec = sys.executable
+    gateway_port = int(os.getenv("GATEWAY_PORT", 8000))
+    host = os.getenv("GATEWAY_HOST", "0.0.0.0")
+
+    # Inherit loaded environment variables for all spawned microservices
+    child_env = os.environ.copy()
 
     for s in SERVICES:
         name = s["name"]
@@ -103,6 +116,7 @@ def main():
         proc = subprocess.Popen(
             cmd,
             cwd=cwd,
+            env=child_env,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
@@ -111,8 +125,8 @@ def main():
 
     print("-" * 70)
     print(" [✓] All 6 Microservices and API Gateway are running!")
-    print(" [✓] API Gateway Swagger UI: http://127.0.0.1:8000/docs")
-    print(" [✓] API Gateway Health Check: http://127.0.0.1:8000/health")
+    print(f" [✓] API Gateway Swagger UI: http://127.0.0.1:{gateway_port}/docs")
+    print(f" [✓] API Gateway Health Check: http://127.0.0.1:{gateway_port}/health")
     print(" [✓] Frontend App: http://localhost:5173")
     print("-" * 70)
     print(" Press Ctrl + C to stop all services.\n")

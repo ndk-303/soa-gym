@@ -24,7 +24,7 @@ def run_all_services():
 
     for name, port, cwd in SERVICES:
         cmd = [py_exec, "-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", str(port)]
-        p = subprocess.Popen(cmd, cwd=cwd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        p = subprocess.Popen(cmd, cwd=cwd, env=os.environ.copy(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         processes.append(p)
 
     # Wait for gateway and all services to become healthy

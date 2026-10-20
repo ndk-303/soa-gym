@@ -1,14 +1,20 @@
 import os
+import sys
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from config import settings
 
-DB_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_FILE = os.path.join(DB_DIR, "booking.db")
-SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_FILE}"
+SQLALCHEMY_DATABASE_URL = settings.effective_db_url
+connect_args = {"check_same_thread": False} if SQLALCHEMY_DATABASE_URL.startswith("sqlite") else {}
 
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    SQLALCHEMY_DATABASE_URL, connect_args=connect_args
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
