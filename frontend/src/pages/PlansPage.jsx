@@ -1,13 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { plansApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
-import { ActionMenu, ManagementHeader, ManagementTable } from '../components/ManagementUI'
+import { ActionMenu, ManagementHeader, ManagementTable, ManagementFilterBar } from '../components/ManagementUI'
 import { formatVnd } from '../components/managementUtils'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function PlansPage() {
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, id: null, loading: false })
 
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -92,25 +98,79 @@ export default function PlansPage() {
     }
   }
 
-  const handleDelete = async (id) => {
-    if (!window.confirm(`Bạn có chắc muốn xóa Gói tập ID #${id}?`)) return
+  const handleOpenDelete = (id) => {
+    setDeleteConfirm({ isOpen: true, id, loading: false })
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirm.id) return
+    setDeleteConfirm((prev) => ({ ...prev, loading: true }))
     try {
-      await plansApi.delete(id)
-      fetchPlans()
+      await plansApi.delete(deleteConfirm.id)
+      setDeleteConfirm({ isOpen: false, id: null, loading: false })
+      fetchData()
     } catch (err) {
-      alert('Lỗi xóa: ' + (err.response?.data?.detail || err.message))
+      setDeleteConfirm({ isOpen: false, id: null, loading: false })
+      setError('Lỗi xóa: ' + (err.response?.data?.detail || err.message))
     }
+  }
+
+  const statusOptions = [
+    { value: 'all', label: 'Tất cả trạng thái' },
+    { value: 'active', label: 'active (Đang mở bán)' },
+    { value: 'inactive', label: 'inactive (Tạm ẩn)' },
+  ]
+
+  const filteredPlans = useMemo(() => {
+    return plans.filter((p) => {
+      const q = searchTerm.trim().toLowerCase()
+      const matchSearch =
+        !q ||
+        (p.name && p.name.toLowerCase().includes(q)) ||
+        String(p.id).includes(q)
+      const isAct = Boolean(p.is_active)
+      const matchStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && isAct) ||
+        (statusFilter === 'inactive' && !isAct)
+      return matchSearch && matchStatus
+    })
+  }, [plans, searchTerm, statusFilter])
+
+  const handleResetFilter = () => {
+    setSearchTerm('')
+    setStatusFilter('all')
   }
 
   return (
     <div>
-      <ManagementHeader title="Gói tập" description="Quản lý thời hạn và mức giá các gói thành viên" onRefresh={fetchPlans} onAdd={handleOpenAdd} addLabel="Thêm gói tập" />
+      <ManagementHeader
+        title="Gói tập"
+        description="Quản lý thời hạn và mức giá các gói thành viên"
+        onRefresh={fetchPlans}
+        onAdd={handleOpenAdd}
+        addLabel="Thêm gói tập"
+        count={plans.length}
+      />
 
       {error && (
         <div className="management-error" role="alert">
           <i className="bi bi-exclamation-circle me-2"></i> {error}
         </div>
       )}
+
+      <ManagementFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Tìm theo tên gói tập hoặc ID..."
+        filterValue={statusFilter}
+        onFilterChange={setStatusFilter}
+        filterOptions={statusOptions}
+        filterLabel="Lọc theo trạng thái mở bán"
+        totalCount={plans.length}
+        filteredCount={filteredPlans.length}
+        onReset={handleResetFilter}
+      />
 
       <ManagementTable
         columns={[
@@ -122,10 +182,22 @@ export default function PlansPage() {
         ]}
         loading={loading}
         loadingMessage="Đang tải dữ liệu Gói tập..."
-        isEmpty={plans.length === 0}
-        emptyMessage="Chưa có dữ liệu gói tập nào"
+        isEmpty={plans.length === 0 || filteredPlans.length === 0}
+        emptyMessage={plans.length === 0 ? 'Chưa có dữ liệu gói tập nào' : 'Không tìm thấy gói tập nào phù hợp với bộ lọc'}
+        emptyIcon={plans.length === 0 ? 'bi-inbox' : 'bi-search'}
+        emptyAction={
+          plans.length > 0 && filteredPlans.length === 0 ? (
+            <button
+              type="button"
+              className="management-secondary-button mt-3"
+              onClick={handleResetFilter}
+            >
+              <i className="bi bi-arrow-counterclockwise"></i> Đặt lại bộ lọc
+            </button>
+          ) : null
+        }
       >
-                {plans.map((p) => (
+        {filteredPlans.map((p) => (
                   <tr key={p.id}>
                     <td><div className="primary-cell">{p.name}</div><div className="secondary-cell">Gói #{p.id}</div></td>
                     <td>{p.duration_days} ngày</td>
@@ -134,21 +206,28 @@ export default function PlansPage() {
                       <StatusBadge status={p.is_active ? 'active' : 'inactive'} />
                     </td>
                     <td className="text-end">
-                      <ActionMenu onEdit={() => handleOpenEdit(p)} onDelete={() => handleDelete(p.id)} />
+                      <ActionMenu onEdit={() => handleOpenEdit(p)} onDelete={() => handleOpenDelete(p.id)} />
                     </td>
                   </tr>
                 ))}
       </ManagementTable>
 
       {showModal && (
-        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div
+          className="modal show d-block"
+          tabIndex="-1"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="plan-modal-title"
+          style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}
+        >
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content border-0 shadow">
               <div className="modal-header">
-                <h5 className="modal-title fw-bold">
+                <h5 id="plan-modal-title" className="modal-title fw-bold">
                   {editingId ? `Cập nhật Gói tập #${editingId}` : 'Thêm mới Gói tập'}
                 </h5>
-                <button type="button" className="btn-close" onClick={handleCloseModal}></button>
+                <button type="button" className="btn-close" onClick={handleCloseModal} aria-label="Đóng"></button>
               </div>
               <form onSubmit={handleSave}>
                 <div className="modal-body">
@@ -158,8 +237,9 @@ export default function PlansPage() {
                     </div>
                   )}
                   <div className="mb-3">
-                    <label className="form-label small fw-bold">Tên gói tập</label>
+                    <label htmlFor="plan-name" className="form-label small fw-bold">Tên gói tập</label>
                     <input
+                      id="plan-name"
                       type="text"
                       className="form-control"
                       value={formData.name}
@@ -170,8 +250,9 @@ export default function PlansPage() {
                   </div>
                   <div className="row g-2 mb-3">
                     <div className="col-md-6">
-                      <label className="form-label small fw-bold">Thời hạn (Ngày)</label>
+                      <label htmlFor="plan-duration" className="form-label small fw-bold">Thời hạn (Ngày)</label>
                       <input
+                        id="plan-duration"
                         type="number"
                         min="1"
                         max="365"
@@ -182,8 +263,9 @@ export default function PlansPage() {
                       />
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label small fw-bold">Giá tiền (VNĐ)</label>
+                      <label htmlFor="plan-price" className="form-label small fw-bold">Giá tiền (VNĐ)</label>
                       <input
+                        id="plan-price"
                         type="number"
                         min="1000"
                         step="1000"
@@ -208,10 +290,10 @@ export default function PlansPage() {
                   </div>
                 </div>
                 <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={handleCloseModal}>
+                  <button type="button" className="management-secondary-button" onClick={handleCloseModal}>
                     Hủy
                   </button>
-                  <button type="submit" className="btn btn-primary btn-sm" disabled={submitting}>
+                  <button type="submit" className="management-primary-button" disabled={submitting}>
                     {submitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Thêm mới')}
                   </button>
                 </div>
@@ -220,6 +302,18 @@ export default function PlansPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        title="Xác nhận xóa Gói tập"
+        message={`Bạn có chắc muốn xóa Gói tập #${deleteConfirm.id}? Thao tác này có thể ảnh hưởng đến các hội viên đang tham chiếu gói này.`}
+        confirmText="Xóa gói tập"
+        cancelText="Hủy bỏ"
+        variant="danger"
+        loading={deleteConfirm.loading}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteConfirm({ isOpen: false, id: null, loading: false })}
+      />
     </div>
   )
 }

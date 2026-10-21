@@ -1,12 +1,18 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { usersApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
-import { ActionMenu, ManagementHeader, ManagementTable } from '../components/ManagementUI'
+import { ActionMenu, ManagementHeader, ManagementTable, ManagementFilterBar } from '../components/ManagementUI'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function UsersPage() {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  const [searchTerm, setSearchTerm] = useState('')
+  const [roleFilter, setRoleFilter] = useState('all')
+
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, id: null, loading: false })
   
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -53,7 +59,7 @@ export default function UsersPage() {
     setFormData({
       email: user.email,
       role: user.role,
-      password: user.password || '',
+      password: '',
       is_active: user.is_active,
     })
     setFormError(null)
@@ -72,7 +78,15 @@ export default function UsersPage() {
     setFormError(null)
     try {
       if (editingId) {
-        await usersApi.update(editingId, formData)
+        const payload = {
+          email: formData.email,
+          role: formData.role,
+          is_active: formData.is_active,
+        }
+        if (formData.password && formData.password.trim()) {
+          payload.password = formData.password
+        }
+        await usersApi.update(editingId, payload)
       } else {
         await usersApi.create(formData)
       }
@@ -85,27 +99,78 @@ export default function UsersPage() {
     }
   }
 
-  const handleDelete = async (id) => {
-    if (!window.confirm(`Bạn có chắc muốn xóa User ID #${id}?`)) return
+  const handleOpenDelete = (id) => {
+    setDeleteConfirm({ isOpen: true, id, loading: false })
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirm.id) return
+    setDeleteConfirm((prev) => ({ ...prev, loading: true }))
     try {
-      await usersApi.delete(id)
+      await usersApi.delete(deleteConfirm.id)
+      setDeleteConfirm({ isOpen: false, id: null, loading: false })
       fetchUsers()
     } catch (err) {
-      alert('Lỗi xóa: ' + (err.response?.data?.detail || err.message))
+      setDeleteConfirm({ isOpen: false, id: null, loading: false })
+      setError('Lỗi xóa: ' + (err.response?.data?.detail || err.message))
     }
   }
 
   const roleLabels = { admin: 'Quản trị viên', trainer: 'Huấn luyện viên', member: 'Hội viên' }
 
+  const roleOptions = [
+    { value: 'all', label: 'Tất cả vai trò' },
+    { value: 'admin', label: 'admin (Quản trị viên)' },
+    { value: 'trainer', label: 'trainer (Huấn luyện viên)' },
+    { value: 'member', label: 'member (Hội viên)' },
+  ]
+
+  const filteredUsers = useMemo(() => {
+    return users.filter((u) => {
+      const q = searchTerm.trim().toLowerCase()
+      const matchSearch =
+        !q ||
+        (u.email && u.email.toLowerCase().includes(q)) ||
+        String(u.id).includes(q)
+      const matchRole = roleFilter === 'all' || u.role === roleFilter
+      return matchSearch && matchRole
+    })
+  }, [users, searchTerm, roleFilter])
+
+  const handleResetFilter = () => {
+    setSearchTerm('')
+    setRoleFilter('all')
+  }
+
   return (
     <div>
-      <ManagementHeader title="Tài khoản" description="Quản lý tài khoản đăng nhập và phân quyền truy cập" onRefresh={fetchUsers} onAdd={handleOpenAdd} addLabel="Thêm tài khoản" />
+      <ManagementHeader
+        title="Tài khoản"
+        description="Quản lý tài khoản đăng nhập và phân quyền truy cập"
+        onRefresh={fetchUsers}
+        onAdd={handleOpenAdd}
+        addLabel="Thêm tài khoản"
+        count={users.length}
+      />
 
       {error && (
         <div className="management-error" role="alert">
           <i className="bi bi-exclamation-circle me-2"></i>{error}
         </div>
       )}
+
+      <ManagementFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Tìm theo email hoặc ID tài khoản..."
+        filterValue={roleFilter}
+        onFilterChange={setRoleFilter}
+        filterOptions={roleOptions}
+        filterLabel="Lọc theo vai trò"
+        totalCount={users.length}
+        filteredCount={filteredUsers.length}
+        onReset={handleResetFilter}
+      />
 
       <ManagementTable
         columns={[
@@ -116,11 +181,23 @@ export default function UsersPage() {
         ]}
         loading={loading}
         loadingMessage="Đang tải dữ liệu Users từ API..."
-        isEmpty={users.length === 0}
-        emptyMessage="Chưa có dữ liệu tài khoản nào"
+        isEmpty={users.length === 0 || filteredUsers.length === 0}
+        emptyMessage={users.length === 0 ? 'Chưa có dữ liệu tài khoản nào' : 'Không tìm thấy tài khoản nào phù hợp với bộ lọc'}
+        emptyIcon={users.length === 0 ? 'bi-inbox' : 'bi-search'}
+        emptyAction={
+          users.length > 0 && filteredUsers.length === 0 ? (
+            <button
+              type="button"
+              className="management-secondary-button mt-3"
+              onClick={handleResetFilter}
+            >
+              <i className="bi bi-arrow-counterclockwise"></i> Đặt lại bộ lọc
+            </button>
+          ) : null
+        }
         minWidth={640}
       >
-                {users.map((u) => (
+        {filteredUsers.map((u) => (
                   <tr key={u.id}>
                     <td><div className="primary-cell">{u.email}</div><div className="secondary-cell">Tài khoản #{u.id}</div></td>
                     <td>
@@ -130,21 +207,28 @@ export default function UsersPage() {
                       <StatusBadge status={u.is_active ? 'active' : 'inactive'} />
                     </td>
                     <td className="text-end">
-                      <ActionMenu onEdit={() => handleOpenEdit(u)} onDelete={() => handleDelete(u.id)} />
+                      <ActionMenu onEdit={() => handleOpenEdit(u)} onDelete={() => handleOpenDelete(u.id)} />
                     </td>
                   </tr>
                 ))}
       </ManagementTable>
 
       {showModal && (
-        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div
+          className="modal show d-block"
+          tabIndex="-1"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="user-modal-title"
+          style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}
+        >
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content border-0 shadow">
               <div className="modal-header">
-                <h5 className="modal-title fw-bold">
+                <h5 className="modal-title fw-bold" id="user-modal-title">
                   {editingId ? `Cập nhật Tài khoản #${editingId}` : 'Thêm mới Tài khoản'}
                 </h5>
-                <button type="button" className="btn-close" onClick={handleCloseModal}></button>
+                <button type="button" className="btn-close" onClick={handleCloseModal} aria-label="Đóng"></button>
               </div>
               <form onSubmit={handleSave}>
                 <div className="modal-body">
@@ -154,8 +238,9 @@ export default function UsersPage() {
                     </div>
                   )}
                   <div className="mb-3">
-                    <label className="form-label small fw-bold">Email</label>
+                    <label htmlFor="user-email" className="form-label small fw-bold">Email</label>
                     <input
+                      id="user-email"
                       type="email"
                       className="form-control"
                       value={formData.email}
@@ -164,19 +249,23 @@ export default function UsersPage() {
                     />
                   </div>
                   <div className="mb-3">
-                    <label className="form-label small fw-bold">Mật khẩu</label>
+                    <label htmlFor="user-password" className="form-label small fw-bold">
+                      {editingId ? 'Mật khẩu mới (Tùy chọn)' : 'Mật khẩu'}
+                    </label>
                     <input
+                      id="user-password"
                       type="password"
                       className="form-control"
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      required
-                      placeholder="Tối thiểu 6 ký tự"
+                      required={!editingId}
+                      placeholder={editingId ? 'Để trống nếu không muốn đổi mật khẩu' : 'Tối thiểu 6 ký tự'}
                     />
                   </div>
                   <div className="mb-3">
-                    <label className="form-label small fw-bold">Vai trò (Role)</label>
+                    <label htmlFor="user-role" className="form-label small fw-bold">Vai trò (Role)</label>
                     <select
+                      id="user-role"
                       className="form-select"
                       value={formData.role}
                       onChange={(e) => setFormData({ ...formData, role: e.target.value })}
@@ -200,10 +289,10 @@ export default function UsersPage() {
                   </div>
                 </div>
                 <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={handleCloseModal}>
+                  <button type="button" className="management-secondary-button" onClick={handleCloseModal}>
                     Hủy
                   </button>
-                  <button type="submit" className="btn btn-primary btn-sm" disabled={submitting}>
+                  <button type="submit" className="management-primary-button" disabled={submitting}>
                     {submitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Thêm mới')}
                   </button>
                 </div>
@@ -212,6 +301,18 @@ export default function UsersPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        title="Xác nhận xóa Tài khoản"
+        message={`Bạn có chắc muốn xóa Tài khoản #${deleteConfirm.id}? Thao tác này sẽ xóa quyền đăng nhập của người dùng.`}
+        confirmText="Xóa tài khoản"
+        cancelText="Hủy bỏ"
+        variant="danger"
+        loading={deleteConfirm.loading}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteConfirm({ isOpen: false, id: null, loading: false })}
+      />
     </div>
   )
 }

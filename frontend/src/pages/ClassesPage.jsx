@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { classesApi, usersApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
-import { ActionMenu, ManagementHeader, ManagementTable } from '../components/ManagementUI'
+import { ActionMenu, ManagementHeader, ManagementTable, ManagementFilterBar } from '../components/ManagementUI'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function ClassesPage() {
   const { isAdmin } = useAuth()
@@ -11,6 +12,11 @@ export default function ClassesPage() {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  const [searchTerm, setSearchTerm] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('all')
+
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, id: null, loading: false })
 
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -101,17 +107,52 @@ export default function ClassesPage() {
     }
   }
 
-  const handleDelete = async (id) => {
-    if (!window.confirm(`Bạn có chắc muốn xóa Lớp học ID #${id}?`)) return
+  const handleOpenDelete = (id) => {
+    setDeleteConfirm({ isOpen: true, id, loading: false })
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirm.id) return
+    setDeleteConfirm((prev) => ({ ...prev, loading: true }))
     try {
-      await classesApi.delete(id)
+      await classesApi.delete(deleteConfirm.id)
+      setDeleteConfirm({ isOpen: false, id: null, loading: false })
       fetchData()
     } catch (err) {
-      alert('Lỗi xóa: ' + (err.response?.data?.detail || err.message))
+      setDeleteConfirm({ isOpen: false, id: null, loading: false })
+      setError('Lỗi xóa: ' + (err.response?.data?.detail || err.message))
     }
   }
 
-  const userMap = Object.fromEntries(users.map((u) => [u.id, u]))
+  const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users])
+
+  const categoryOptions = useMemo(() => {
+    const cats = Array.from(new Set(classes.map((c) => c.category).filter(Boolean)))
+    return [
+      { value: 'all', label: 'Tất cả bộ môn' },
+      ...cats.map((cat) => ({ value: cat, label: cat })),
+    ]
+  }, [classes])
+
+  const filteredClasses = useMemo(() => {
+    return classes.filter((c) => {
+      const q = searchTerm.trim().toLowerCase()
+      const trainer = c.trainer || userMap[c.trainer_id]
+      const matchSearch =
+        !q ||
+        c.name.toLowerCase().includes(q) ||
+        (c.category && c.category.toLowerCase().includes(q)) ||
+        (trainer?.email && trainer.email.toLowerCase().includes(q)) ||
+        String(c.id).includes(q)
+      const matchCategory = categoryFilter === 'all' || c.category === categoryFilter
+      return matchSearch && matchCategory
+    })
+  }, [classes, searchTerm, categoryFilter, userMap])
+
+  const handleResetFilter = () => {
+    setSearchTerm('')
+    setCategoryFilter('all')
+  }
 
   return (
     <div>
@@ -121,6 +162,7 @@ export default function ClassesPage() {
         onRefresh={fetchData}
         onAdd={isAdmin ? handleOpenAdd : undefined}
         addLabel="Thêm lớp học"
+        count={classes.length}
       />
 
       {error && (
@@ -128,6 +170,19 @@ export default function ClassesPage() {
           <i className="bi bi-exclamation-circle me-2"></i> {error}
         </div>
       )}
+
+      <ManagementFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Tìm theo tên lớp, bộ môn hoặc HLV..."
+        filterValue={categoryFilter}
+        onFilterChange={setCategoryFilter}
+        filterOptions={categoryOptions}
+        filterLabel="Lọc theo bộ môn"
+        totalCount={classes.length}
+        filteredCount={filteredClasses.length}
+        onReset={handleResetFilter}
+      />
 
       <ManagementTable
         columns={[
@@ -139,10 +194,22 @@ export default function ClassesPage() {
         ]}
         loading={loading}
         loadingMessage="Đang tải dữ liệu Lớp học..."
-        isEmpty={classes.length === 0}
-        emptyMessage="Chưa có dữ liệu lớp học nào"
+        isEmpty={classes.length === 0 || filteredClasses.length === 0}
+        emptyMessage={classes.length === 0 ? 'Chưa có dữ liệu lớp học nào' : 'Không tìm thấy lớp học nào phù hợp với bộ lọc'}
+        emptyIcon={classes.length === 0 ? 'bi-inbox' : 'bi-search'}
+        emptyAction={
+          classes.length > 0 && filteredClasses.length === 0 ? (
+            <button
+              type="button"
+              className="management-secondary-button mt-3"
+              onClick={handleResetFilter}
+            >
+              <i className="bi bi-arrow-counterclockwise"></i> Đặt lại bộ lọc
+            </button>
+          ) : null
+        }
       >
-        {classes.map((c) => {
+        {filteredClasses.map((c) => {
           const trainer = c.trainer || userMap[c.trainer_id]
           return (
             <tr key={c.id}>
@@ -156,7 +223,7 @@ export default function ClassesPage() {
               </td>
               {isAdmin && (
                 <td className="text-end">
-                  <ActionMenu onEdit={() => handleOpenEdit(c)} onDelete={() => handleDelete(c.id)} />
+                  <ActionMenu onEdit={() => handleOpenEdit(c)} onDelete={() => handleOpenDelete(c.id)} />
                 </td>
               )}
             </tr>
@@ -166,14 +233,21 @@ export default function ClassesPage() {
 
 
       {showModal && (
-        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div
+          className="modal show d-block"
+          tabIndex="-1"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="class-modal-title"
+          style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}
+        >
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content border-0 shadow">
               <div className="modal-header">
-                <h5 className="modal-title fw-bold">
+                <h5 id="class-modal-title" className="modal-title fw-bold">
                   {editingId ? `Cập nhật Lớp học #${editingId}` : 'Thêm mới Lớp học'}
                 </h5>
-                <button type="button" className="btn-close" onClick={handleCloseModal}></button>
+                <button type="button" className="btn-close" onClick={handleCloseModal} aria-label="Đóng"></button>
               </div>
               <form onSubmit={handleSave}>
                 <div className="modal-body">
@@ -183,8 +257,9 @@ export default function ClassesPage() {
                     </div>
                   )}
                   <div className="mb-3">
-                    <label className="form-label small fw-bold">Tên lớp học</label>
+                    <label htmlFor="class-name" className="form-label small fw-bold">Tên lớp học</label>
                     <input
+                      id="class-name"
                       type="text"
                       className="form-control"
                       value={formData.name}
@@ -194,8 +269,9 @@ export default function ClassesPage() {
                     />
                   </div>
                   <div className="mb-3">
-                    <label className="form-label small fw-bold">Thể loại (Category)</label>
+                    <label htmlFor="class-category" className="form-label small fw-bold">Thể loại (Category)</label>
                     <input
+                      id="class-category"
                       type="text"
                       className="form-control"
                       value={formData.category}
@@ -205,8 +281,9 @@ export default function ClassesPage() {
                     />
                   </div>
                   <div className="mb-3">
-                    <label className="form-label small fw-bold">Chọn Huấn luyện viên phụ trách</label>
+                    <label htmlFor="class-trainer-id" className="form-label small fw-bold">Chọn Huấn luyện viên phụ trách</label>
                     <select
+                      id="class-trainer-id"
                       className="form-select"
                       value={formData.trainer_id}
                       onChange={(e) => setFormData({ ...formData, trainer_id: e.target.value })}
@@ -236,10 +313,10 @@ export default function ClassesPage() {
                   </div>
                 </div>
                 <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={handleCloseModal}>
+                  <button type="button" className="management-secondary-button" onClick={handleCloseModal}>
                     Hủy
                   </button>
-                  <button type="submit" className="btn btn-primary btn-sm" disabled={submitting}>
+                  <button type="submit" className="management-primary-button" disabled={submitting}>
                     {submitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Thêm mới')}
                   </button>
                 </div>
@@ -248,6 +325,18 @@ export default function ClassesPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        title="Xác nhận xóa Lớp học"
+        message={`Bạn có chắc muốn xóa Lớp học #${deleteConfirm.id}? Thao tác này sẽ ảnh hưởng đến các ca tập thuộc lớp này.`}
+        confirmText="Xóa lớp học"
+        cancelText="Hủy bỏ"
+        variant="danger"
+        loading={deleteConfirm.loading}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteConfirm({ isOpen: false, id: null, loading: false })}
+      />
     </div>
   )
 }

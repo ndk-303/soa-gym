@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { membersApi, usersApi, plansApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
-import { ActionMenu, ManagementHeader, ManagementTable } from '../components/ManagementUI'
+import { ActionMenu, ManagementHeader, ManagementTable, ManagementFilterBar } from '../components/ManagementUI'
+import { formatVnd } from '../components/managementUtils'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function MembersPage() {
   const [members, setMembers] = useState([])
@@ -9,6 +11,11 @@ export default function MembersPage() {
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, id: null, loading: false })
 
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -116,28 +123,82 @@ export default function MembersPage() {
     }
   }
 
-  const handleDelete = async (id) => {
-    if (!window.confirm(`Bạn có chắc muốn xóa Hội viên ID #${id}?`)) return
+  const handleOpenDelete = (id) => {
+    setDeleteConfirm({ isOpen: true, id, loading: false })
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirm.id) return
+    setDeleteConfirm((prev) => ({ ...prev, loading: true }))
     try {
-      await membersApi.delete(id)
+      await membersApi.delete(deleteConfirm.id)
+      setDeleteConfirm({ isOpen: false, id: null, loading: false })
       fetchData()
     } catch (err) {
-      alert('Lỗi xóa: ' + (err.response?.data?.detail || err.message))
+      setDeleteConfirm({ isOpen: false, id: null, loading: false })
+      setError('Lỗi xóa: ' + (err.response?.data?.detail || err.message))
     }
   }
 
   const userMap = Object.fromEntries(users.map((u) => [u.id, u]))
   const planMap = Object.fromEntries(plans.map((p) => [p.id, p]))
 
+  const statusOptions = [
+    { value: 'all', label: 'Tất cả trạng thái' },
+    { value: 'active', label: 'active (Hoạt động)' },
+    { value: 'pending', label: 'pending (Chờ kích hoạt)' },
+    { value: 'expired', label: 'expired (Hết hạn)' },
+    { value: 'cancelled', label: 'cancelled (Đã hủy)' },
+  ]
+
+  const filteredMembers = useMemo(() => {
+    return members.filter((m) => {
+      const q = searchTerm.trim().toLowerCase()
+      const matchSearch =
+        !q ||
+        (m.full_name && m.full_name.toLowerCase().includes(q)) ||
+        (m.email && m.email.toLowerCase().includes(q)) ||
+        (m.phone_number && m.phone_number.toLowerCase().includes(q)) ||
+        String(m.id).includes(q)
+      const matchStatus = statusFilter === 'all' || m.status === statusFilter
+      return matchSearch && matchStatus
+    })
+  }, [members, searchTerm, statusFilter])
+
+  const handleResetFilter = () => {
+    setSearchTerm('')
+    setStatusFilter('all')
+  }
+
   return (
     <div>
-      <ManagementHeader title="Hội viên" description="Hồ sơ hội viên, gói tập hiện tại và trạng thái kích hoạt" onRefresh={fetchData} onAdd={handleOpenAdd} addLabel="Thêm hội viên" />
+      <ManagementHeader
+        title="Hội viên"
+        description="Hồ sơ hội viên, gói tập hiện tại và trạng thái kích hoạt"
+        onRefresh={fetchData}
+        onAdd={handleOpenAdd}
+        addLabel="Thêm hội viên"
+        count={members.length}
+      />
 
       {error && (
         <div className="management-error" role="alert">
           <i className="bi bi-exclamation-circle me-2"></i> {error}
         </div>
       )}
+
+      <ManagementFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Tìm theo tên, email, SĐT hoặc ID..."
+        filterValue={statusFilter}
+        onFilterChange={setStatusFilter}
+        filterOptions={statusOptions}
+        filterLabel="Lọc theo trạng thái hội viên"
+        totalCount={members.length}
+        filteredCount={filteredMembers.length}
+        onReset={handleResetFilter}
+      />
 
       <ManagementTable
         columns={[
@@ -149,10 +210,22 @@ export default function MembersPage() {
         ]}
         loading={loading}
         loadingMessage="Đang tải dữ liệu Hội viên..."
-        isEmpty={members.length === 0}
-        emptyMessage="Chưa có dữ liệu hội viên nào"
+        isEmpty={members.length === 0 || filteredMembers.length === 0}
+        emptyMessage={members.length === 0 ? 'Chưa có dữ liệu hội viên nào' : 'Không tìm thấy hội viên nào phù hợp với bộ lọc'}
+        emptyIcon={members.length === 0 ? 'bi-inbox' : 'bi-search'}
+        emptyAction={
+          members.length > 0 && filteredMembers.length === 0 ? (
+            <button
+              type="button"
+              className="management-secondary-button mt-3"
+              onClick={handleResetFilter}
+            >
+              <i className="bi bi-arrow-counterclockwise"></i> Đặt lại bộ lọc
+            </button>
+          ) : null
+        }
       >
-                {members.map((m) => {
+        {filteredMembers.map((m) => {
                   const linkedUser = m.user || userMap[m.user_id]
                   const linkedPlan = m.membership_plan || planMap[m.membership_plan_id]
                   return (
@@ -175,7 +248,7 @@ export default function MembersPage() {
                         <StatusBadge status={m.status} />
                       </td>
                       <td className="text-end">
-                        <ActionMenu onEdit={() => handleOpenEdit(m)} onDelete={() => handleDelete(m.id)} />
+                        <ActionMenu onEdit={() => handleOpenEdit(m)} onDelete={() => handleOpenDelete(m.id)} />
                       </td>
                     </tr>
                   )
@@ -183,14 +256,21 @@ export default function MembersPage() {
       </ManagementTable>
 
       {showModal && (
-        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div
+          className="modal show d-block"
+          tabIndex="-1"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="member-modal-title"
+          style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}
+        >
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content border-0 shadow">
               <div className="modal-header">
-                <h5 className="modal-title fw-bold">
+                <h5 id="member-modal-title" className="modal-title fw-bold">
                   {editingId ? `Cập nhật Hội viên #${editingId}` : 'Thêm mới Hội viên'}
                 </h5>
-                <button type="button" className="btn-close" onClick={handleCloseModal}></button>
+                <button type="button" className="btn-close" onClick={handleCloseModal} aria-label="Đóng"></button>
               </div>
               <form onSubmit={handleSave}>
                 <div className="modal-body">
@@ -201,8 +281,9 @@ export default function MembersPage() {
                   )}
 
                   <div className="mb-3">
-                    <label className="form-label small fw-bold">Chọn Tài khoản User liên kết</label>
+                    <label htmlFor="member-user-id" className="form-label small fw-bold">Chọn Tài khoản User liên kết</label>
                     <select
+                      id="member-user-id"
                       className="form-select"
                       value={formData.user_id}
                       onChange={(e) => handleUserSelect(e.target.value)}
@@ -221,8 +302,9 @@ export default function MembersPage() {
                   </div>
 
                   <div className="mb-3">
-                    <label className="form-label small fw-bold">Họ và Tên Hội viên</label>
+                    <label htmlFor="member-full-name" className="form-label small fw-bold">Họ và Tên Hội viên</label>
                     <input
+                      id="member-full-name"
                       type="text"
                       className="form-control"
                       value={formData.full_name}
@@ -233,8 +315,9 @@ export default function MembersPage() {
                   </div>
 
                   <div className="mb-3">
-                    <label className="form-label small fw-bold">Email liên lạc</label>
+                    <label htmlFor="member-email" className="form-label small fw-bold">Email liên lạc</label>
                     <input
+                      id="member-email"
                       type="email"
                       className="form-control"
                       value={formData.email}
@@ -244,8 +327,9 @@ export default function MembersPage() {
                   </div>
 
                   <div className="mb-3">
-                    <label className="form-label small fw-bold">Chọn Gói tập</label>
+                    <label htmlFor="member-plan-id" className="form-label small fw-bold">Chọn Gói tập</label>
                     <select
+                      id="member-plan-id"
                       className="form-select"
                       value={formData.membership_plan_id}
                       onChange={(e) => setFormData({ ...formData, membership_plan_id: e.target.value })}
@@ -253,15 +337,16 @@ export default function MembersPage() {
                       <option value="">-- Chưa đăng ký gói tập --</option>
                       {plans.map((p) => (
                         <option key={p.id} value={p.id}>
-                          {p.name} - {Number(p.price).toLocaleString()}đ ({p.duration_days} ngày)
+                          {p.name} - {formatVnd(p.price)} ({p.duration_days} ngày)
                         </option>
                       ))}
                     </select>
                   </div>
 
                   <div className="mb-2">
-                    <label className="form-label small fw-bold">Trạng thái Hội viên</label>
+                    <label htmlFor="member-status" className="form-label small fw-bold">Trạng thái Hội viên</label>
                     <select
+                      id="member-status"
                       className="form-select"
                       value={formData.status}
                       onChange={(e) => setFormData({ ...formData, status: e.target.value })}
@@ -273,10 +358,10 @@ export default function MembersPage() {
                   </div>
                 </div>
                 <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={handleCloseModal}>
+                  <button type="button" className="management-secondary-button" onClick={handleCloseModal}>
                     Hủy
                   </button>
-                  <button type="submit" className="btn btn-primary btn-sm" disabled={submitting}>
+                  <button type="submit" className="management-primary-button" disabled={submitting}>
                     {submitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Thêm mới')}
                   </button>
                 </div>
@@ -285,6 +370,18 @@ export default function MembersPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        title="Xác nhận xóa Hội viên"
+        message={`Bạn có chắc muốn xóa Hội viên #${deleteConfirm.id}? Thao tác này sẽ xóa hồ sơ và thông tin liên quan.`}
+        confirmText="Xóa hội viên"
+        cancelText="Hủy bỏ"
+        variant="danger"
+        loading={deleteConfirm.loading}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteConfirm({ isOpen: false, id: null, loading: false })}
+      />
     </div>
   )
 }
