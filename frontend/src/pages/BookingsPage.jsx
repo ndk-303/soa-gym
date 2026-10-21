@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { bookingsApi, membersApi, slotsApi, classesApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
-import { ActionMenu, ManagementHeader, ManagementTable } from '../components/ManagementUI'
+import { ActionMenu, ManagementHeader, ManagementTable, ManagementFilterBar } from '../components/ManagementUI'
 import { formatSchedule } from '../components/managementUtils'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function BookingsPage() {
   const { isAdmin } = useAuth()
@@ -14,6 +15,11 @@ export default function BookingsPage() {
   const [classes, setClasses] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, id: null, loading: false })
 
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -106,29 +112,86 @@ export default function BookingsPage() {
     }
   }
 
-  const handleDelete = async (id) => {
-    if (!window.confirm(`Bạn có chắc muốn hủy/xóa Đặt chỗ ID #${id}?`)) return
+  const handleOpenDelete = (id) => {
+    setDeleteConfirm({ isOpen: true, id, loading: false })
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirm.id) return
+    setDeleteConfirm((prev) => ({ ...prev, loading: true }))
     try {
-      await bookingsApi.delete(id)
+      await bookingsApi.delete(deleteConfirm.id)
+      setDeleteConfirm({ isOpen: false, id: null, loading: false })
       fetchData()
     } catch (err) {
-      alert('Lỗi xóa: ' + (err.response?.data?.detail || err.message))
+      setDeleteConfirm({ isOpen: false, id: null, loading: false })
+      setError('Lỗi xóa: ' + (err.response?.data?.detail || err.message))
     }
   }
 
-  const memberMap = Object.fromEntries(members.map((m) => [m.id, m]))
-  const slotMap = Object.fromEntries(slots.map((s) => [s.id, s]))
-  const classMap = Object.fromEntries(classes.map((c) => [c.id, c]))
+  const memberMap = useMemo(() => Object.fromEntries(members.map((m) => [m.id, m])), [members])
+  const slotMap = useMemo(() => Object.fromEntries(slots.map((s) => [s.id, s])), [slots])
+  const classMap = useMemo(() => Object.fromEntries(classes.map((c) => [c.id, c])), [classes])
+
+  const statusOptions = [
+    { value: 'all', label: 'Tất cả trạng thái' },
+    { value: 'confirmed', label: 'confirmed (Đã xác nhận)' },
+    { value: 'waitlisted', label: 'waitlisted (Danh sách chờ)' },
+    { value: 'attended', label: 'attended (Đã tham gia)' },
+    { value: 'cancelled', label: 'cancelled (Đã hủy)' },
+  ]
+
+  const filteredBookings = useMemo(() => {
+    return bookings.filter((b) => {
+      const q = searchTerm.trim().toLowerCase()
+      const member = b.member || memberMap[b.member_id]
+      const slot = b.slot || slotMap[b.slot_id]
+      const gymClass = slot?.class || (slot ? classMap[slot.class_id] : null)
+      const matchSearch =
+        !q ||
+        (member?.full_name && member.full_name.toLowerCase().includes(q)) ||
+        (member?.email && member.email.toLowerCase().includes(q)) ||
+        (gymClass?.name && gymClass.name.toLowerCase().includes(q)) ||
+        String(b.id).includes(q)
+      const matchStatus = statusFilter === 'all' || b.status === statusFilter
+      return matchSearch && matchStatus
+    })
+  }, [bookings, searchTerm, statusFilter, memberMap, slotMap, classMap])
+
+  const handleResetFilter = () => {
+    setSearchTerm('')
+    setStatusFilter('all')
+  }
 
   return (
     <div>
-      <ManagementHeader title="Đặt chỗ" description="Theo dõi đăng ký lớp học và danh sách chờ của hội viên" onRefresh={fetchData} onAdd={handleOpenAdd} addLabel="Đặt chỗ mới" />
+      <ManagementHeader
+        title="Đặt chỗ"
+        description="Theo dõi đăng ký lớp học và danh sách chờ của hội viên"
+        onRefresh={fetchData}
+        onAdd={handleOpenAdd}
+        addLabel="Đặt chỗ mới"
+        count={bookings.length}
+      />
 
       {error && (
         <div className="management-error" role="alert">
           <i className="bi bi-exclamation-circle me-2"></i> {error}
         </div>
       )}
+
+      <ManagementFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Tìm theo tên hội viên, lớp học hoặc mã..."
+        filterValue={statusFilter}
+        onFilterChange={setStatusFilter}
+        filterOptions={statusOptions}
+        filterLabel="Lọc theo trạng thái đặt chỗ"
+        totalCount={bookings.length}
+        filteredCount={filteredBookings.length}
+        onReset={handleResetFilter}
+      />
 
       <ManagementTable
         columns={[
@@ -140,10 +203,22 @@ export default function BookingsPage() {
         ]}
         loading={loading}
         loadingMessage="Đang tải dữ liệu Đặt chỗ..."
-        isEmpty={bookings.length === 0}
-        emptyMessage="Chưa có dữ liệu đặt chỗ nào"
+        isEmpty={bookings.length === 0 || filteredBookings.length === 0}
+        emptyMessage={bookings.length === 0 ? 'Chưa có dữ liệu đặt chỗ nào' : 'Không tìm thấy đặt chỗ nào phù hợp với bộ lọc'}
+        emptyIcon={bookings.length === 0 ? 'bi-inbox' : 'bi-search'}
+        emptyAction={
+          bookings.length > 0 && filteredBookings.length === 0 ? (
+            <button
+              type="button"
+              className="management-secondary-button mt-3"
+              onClick={handleResetFilter}
+            >
+              <i className="bi bi-arrow-counterclockwise"></i> Đặt lại bộ lọc
+            </button>
+          ) : null
+        }
       >
-        {bookings.map((b) => {
+        {filteredBookings.map((b) => {
           const member = b.member || memberMap[b.member_id]
           const slot = b.slot || slotMap[b.slot_id]
           const gymClass = slot?.class || (slot ? classMap[slot.class_id] : null)
@@ -163,7 +238,7 @@ export default function BookingsPage() {
               </td>
               {isAdmin && (
                 <td className="text-end">
-                  <ActionMenu onEdit={() => handleOpenEdit(b)} onDelete={() => handleDelete(b.id)} deleteLabel="Xóa đặt chỗ" />
+                  <ActionMenu onEdit={() => handleOpenEdit(b)} onDelete={() => handleOpenDelete(b.id)} deleteLabel="Xóa đặt chỗ" />
                 </td>
               )}
             </tr>
@@ -173,14 +248,21 @@ export default function BookingsPage() {
 
 
       {showModal && (
-        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div
+          className="modal show d-block"
+          tabIndex="-1"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="booking-modal-title"
+          style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}
+        >
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content border-0 shadow">
               <div className="modal-header">
-                <h5 className="modal-title fw-bold">
+                <h5 id="booking-modal-title" className="modal-title fw-bold">
                   {editingId ? `Cập nhật Đặt chỗ #${editingId}` : 'Thêm mới Đặt chỗ'}
                 </h5>
-                <button type="button" className="btn-close" onClick={handleCloseModal}></button>
+                <button type="button" className="btn-close" onClick={handleCloseModal} aria-label="Đóng"></button>
               </div>
               <form onSubmit={handleSave}>
                 <div className="modal-body">
@@ -190,8 +272,9 @@ export default function BookingsPage() {
                     </div>
                   )}
                   <div className="mb-3">
-                    <label className="form-label small fw-bold">Chọn Hội viên</label>
+                    <label htmlFor="booking-member-id" className="form-label small fw-bold">Chọn Hội viên</label>
                     <select
+                      id="booking-member-id"
                       className="form-select"
                       value={formData.member_id}
                       onChange={(e) => setFormData({ ...formData, member_id: e.target.value })}
@@ -207,8 +290,9 @@ export default function BookingsPage() {
                   </div>
 
                   <div className="mb-3">
-                    <label className="form-label small fw-bold">Chọn Ca tập</label>
+                    <label htmlFor="booking-slot-id" className="form-label small fw-bold">Chọn Ca tập</label>
                     <select
+                      id="booking-slot-id"
                       className="form-select"
                       value={formData.slot_id}
                       onChange={(e) => setFormData({ ...formData, slot_id: e.target.value })}
@@ -227,8 +311,9 @@ export default function BookingsPage() {
                   </div>
 
                   <div className="mb-3">
-                    <label className="form-label small fw-bold">Trạng thái đặt chỗ</label>
+                    <label htmlFor="booking-status" className="form-label small fw-bold">Trạng thái đặt chỗ</label>
                     <select
+                      id="booking-status"
                       className="form-select"
                       value={formData.status}
                       onChange={(e) => setFormData({ ...formData, status: e.target.value })}
@@ -240,8 +325,9 @@ export default function BookingsPage() {
                   </div>
 
                   <div className="mb-2">
-                    <label className="form-label small fw-bold">Vị trí hàng chờ (nếu vào waitlist)</label>
+                    <label htmlFor="booking-waitlist" className="form-label small fw-bold">Vị trí hàng chờ (nếu vào waitlist)</label>
                     <input
+                      id="booking-waitlist"
                       type="number"
                       min="1"
                       placeholder="Để trống nếu đã xác nhận"
@@ -252,10 +338,10 @@ export default function BookingsPage() {
                   </div>
                 </div>
                 <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={handleCloseModal}>
+                  <button type="button" className="management-secondary-button" onClick={handleCloseModal}>
                     Hủy
                   </button>
-                  <button type="submit" className="btn btn-primary btn-sm" disabled={submitting}>
+                  <button type="submit" className="management-primary-button" disabled={submitting}>
                     {submitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Thêm mới')}
                   </button>
                 </div>
@@ -264,6 +350,18 @@ export default function BookingsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        title="Xác nhận hủy đặt chỗ"
+        message={`Bạn có chắc muốn hủy bản ghi Đặt chỗ #${deleteConfirm.id}? Thao tác này không thể hoàn tác.`}
+        confirmText="Hủy đặt chỗ"
+        cancelText="Quay lại"
+        variant="danger"
+        loading={deleteConfirm.loading}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteConfirm({ isOpen: false, id: null, loading: false })}
+      />
     </div>
   )
 }

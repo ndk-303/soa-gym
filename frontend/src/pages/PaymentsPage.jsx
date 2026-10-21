@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { paymentsApi, invoicesApi, membersApi } from '../services/api'
-import { ActionMenu, ManagementHeader, ManagementTable } from '../components/ManagementUI'
+import { ActionMenu, ManagementHeader, ManagementTable, ManagementFilterBar } from '../components/ManagementUI'
 import { formatVnd } from '../components/managementUtils'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState([])
@@ -9,6 +10,11 @@ export default function PaymentsPage() {
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  const [searchTerm, setSearchTerm] = useState('')
+  const [methodFilter, setMethodFilter] = useState('all')
+
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, id: null, loading: false })
 
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -109,28 +115,86 @@ export default function PaymentsPage() {
     }
   }
 
-  const handleDelete = async (id) => {
-    if (!window.confirm(`Bạn có chắc muốn xóa Giao dịch Thanh toán ID #${id}?`)) return
+  const handleOpenDelete = (id) => {
+    setDeleteConfirm({ isOpen: true, id, loading: false })
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirm.id) return
+    setDeleteConfirm((prev) => ({ ...prev, loading: true }))
     try {
-      await paymentsApi.delete(id)
+      await paymentsApi.delete(deleteConfirm.id)
+      setDeleteConfirm({ isOpen: false, id: null, loading: false })
       fetchData()
     } catch (err) {
-      alert('Lỗi xóa: ' + (err.response?.data?.detail || err.message))
+      setDeleteConfirm({ isOpen: false, id: null, loading: false })
+      setError('Lỗi xóa: ' + (err.response?.data?.detail || err.message))
     }
   }
 
-  const invoiceMap = Object.fromEntries(invoices.map((inv) => [inv.id, inv]))
-  const memberMap = Object.fromEntries(members.map((m) => [m.id, m]))
+  const invoiceMap = useMemo(() => Object.fromEntries(invoices.map((inv) => [inv.id, inv])), [invoices])
+  const memberMap = useMemo(() => Object.fromEntries(members.map((m) => [m.id, m])), [members])
+
+  const methodOptions = [
+    { value: 'all', label: 'Tất cả phương thức' },
+    { value: 'cash', label: 'Tiền mặt (cash)' },
+    { value: 'bank_transfer', label: 'Chuyển khoản (bank_transfer)' },
+    { value: 'vietqr', label: 'VietQR' },
+    { value: 'credit_card', label: 'Thẻ tín dụng (credit_card)' },
+  ]
+
+  const filteredPayments = useMemo(() => {
+    return payments.filter((p) => {
+      const q = searchTerm.trim().toLowerCase()
+      const linkedInv = p.invoice || invoiceMap[p.invoice_id]
+      const linkedMember = p.member || linkedInv?.member || (linkedInv ? memberMap[linkedInv.member_id] : null)
+      const matchSearch =
+        !q ||
+        String(p.id).includes(q) ||
+        `gd #${p.id}`.toLowerCase().includes(q) ||
+        String(p.invoice_id).includes(q) ||
+        `hóa đơn #${p.invoice_id}`.toLowerCase().includes(q) ||
+        (linkedMember?.full_name && linkedMember.full_name.toLowerCase().includes(q)) ||
+        (p.notes && p.notes.toLowerCase().includes(q))
+      const matchMethod = methodFilter === 'all' || p.payment_method === methodFilter
+      return matchSearch && matchMethod
+    })
+  }, [payments, searchTerm, methodFilter, invoiceMap, memberMap])
+
+  const handleResetFilter = () => {
+    setSearchTerm('')
+    setMethodFilter('all')
+  }
 
   return (
     <div>
-      <ManagementHeader title="Thanh toán" description="Lịch sử thu tiền và phương thức thanh toán theo từng hóa đơn" onRefresh={fetchData} onAdd={handleOpenAdd} addLabel="Ghi nhận thanh toán" />
+      <ManagementHeader
+        title="Thanh toán"
+        description="Lịch sử thu tiền và phương thức thanh toán theo từng hóa đơn"
+        onRefresh={fetchData}
+        onAdd={handleOpenAdd}
+        addLabel="Ghi nhận thanh toán"
+        count={payments.length}
+      />
 
       {error && (
         <div className="management-error" role="alert">
           <i className="bi bi-exclamation-circle me-2"></i> {error}
         </div>
       )}
+
+      <ManagementFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Tìm theo mã GD, mã HĐ, hội viên hoặc ghi chú..."
+        filterValue={methodFilter}
+        onFilterChange={setMethodFilter}
+        filterOptions={methodOptions}
+        filterLabel="Lọc theo phương thức thanh toán"
+        totalCount={payments.length}
+        filteredCount={filteredPayments.length}
+        onReset={handleResetFilter}
+      />
 
       <ManagementTable
         columns={[
@@ -143,11 +207,23 @@ export default function PaymentsPage() {
         ]}
         loading={loading}
         loadingMessage="Đang tải dữ liệu Thanh toán..."
-        isEmpty={payments.length === 0}
-        emptyMessage="Chưa có dữ liệu thanh toán nào"
+        isEmpty={payments.length === 0 || filteredPayments.length === 0}
+        emptyMessage={payments.length === 0 ? 'Chưa có dữ liệu thanh toán nào' : 'Không tìm thấy giao dịch nào phù hợp với bộ lọc'}
+        emptyIcon={payments.length === 0 ? 'bi-inbox' : 'bi-search'}
+        emptyAction={
+          payments.length > 0 && filteredPayments.length === 0 ? (
+            <button
+              type="button"
+              className="management-secondary-button mt-3"
+              onClick={handleResetFilter}
+            >
+              <i className="bi bi-arrow-counterclockwise"></i> Đặt lại bộ lọc
+            </button>
+          ) : null
+        }
         minWidth={900}
       >
-                {payments.map((p) => {
+        {filteredPayments.map((p) => {
                   const linkedInv = p.invoice || invoiceMap[p.invoice_id]
                   const linkedMember = p.member || linkedInv?.member || (linkedInv ? memberMap[linkedInv.member_id] : null)
                   return (
@@ -163,7 +239,7 @@ export default function PaymentsPage() {
                       </td>
                       <td className="table-note">{p.notes || '—'}</td>
                       <td className="text-end">
-                        <ActionMenu onEdit={() => handleOpenEdit(p)} onDelete={() => handleDelete(p.id)} />
+                        <ActionMenu onEdit={() => handleOpenEdit(p)} onDelete={() => handleOpenDelete(p.id)} />
                       </td>
                     </tr>
                   )
@@ -171,14 +247,21 @@ export default function PaymentsPage() {
       </ManagementTable>
 
       {showModal && (
-        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div
+          className="modal show d-block"
+          tabIndex="-1"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="payment-modal-title"
+          style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}
+        >
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content border-0 shadow">
               <div className="modal-header">
-                <h5 className="modal-title fw-bold">
+                <h5 className="modal-title fw-bold" id="payment-modal-title">
                   {editingId ? `Cập nhật Thanh toán #${editingId}` : 'Ghi nhận Thanh toán mới'}
                 </h5>
-                <button type="button" className="btn-close" onClick={handleCloseModal}></button>
+                <button type="button" className="btn-close" onClick={handleCloseModal} aria-label="Đóng"></button>
               </div>
               <form onSubmit={handleSave}>
                 <div className="modal-body">
@@ -188,8 +271,9 @@ export default function PaymentsPage() {
                     </div>
                   )}
                   <div className="mb-3">
-                    <label className="form-label small fw-bold">Chọn Hóa đơn cần thanh toán</label>
+                    <label htmlFor="payment-invoice-select" className="form-label small fw-bold">Chọn Hóa đơn cần thanh toán</label>
                     <select
+                      id="payment-invoice-select"
                       className="form-select"
                       value={formData.invoice_id}
                       onChange={(e) => handleInvoiceSelect(e.target.value)}
@@ -201,15 +285,16 @@ export default function PaymentsPage() {
                         const remaining = Math.max(0, inv.amount - inv.amount_paid)
                         return (
                           <option key={inv.id} value={inv.id}>
-                            Hóa đơn #{inv.id} - {m ? m.full_name : `Hội viên #${inv.member_id}`} (Tổng: {Number(inv.amount).toLocaleString()}đ, Còn thiếu: {remaining.toLocaleString()}đ)
+                            Hóa đơn #{inv.id} - {m ? m.full_name : `Hội viên #${inv.member_id}`} (Tổng: {formatVnd(inv.amount)}, Còn thiếu: {formatVnd(remaining)})
                           </option>
                         )
                       })}
                     </select>
                   </div>
                   <div className="mb-3">
-                    <label className="form-label small fw-bold">Số tiền thanh toán (VNĐ)</label>
+                    <label htmlFor="payment-amount" className="form-label small fw-bold">Số tiền thanh toán (VNĐ)</label>
                     <input
+                      id="payment-amount"
                       type="number"
                       min="1000"
                       step="1000"
@@ -220,8 +305,9 @@ export default function PaymentsPage() {
                     />
                   </div>
                   <div className="mb-3">
-                    <label className="form-label small fw-bold">Phương thức thanh toán</label>
+                    <label htmlFor="payment-method-select" className="form-label small fw-bold">Phương thức thanh toán</label>
                     <select
+                      id="payment-method-select"
                       className="form-select"
                       value={formData.payment_method}
                       onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
@@ -233,8 +319,9 @@ export default function PaymentsPage() {
                     </select>
                   </div>
                   <div className="mb-2">
-                    <label className="form-label small fw-bold">Ghi chú</label>
+                    <label htmlFor="payment-notes" className="form-label small fw-bold">Ghi chú</label>
                     <input
+                      id="payment-notes"
                       type="text"
                       className="form-control"
                       value={formData.notes}
@@ -244,10 +331,10 @@ export default function PaymentsPage() {
                   </div>
                 </div>
                 <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={handleCloseModal}>
+                  <button type="button" className="management-secondary-button" onClick={handleCloseModal}>
                     Hủy
                   </button>
-                  <button type="submit" className="btn btn-primary btn-sm" disabled={submitting}>
+                  <button type="submit" className="management-primary-button" disabled={submitting}>
                     {submitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Thêm mới')}
                   </button>
                 </div>
@@ -256,6 +343,18 @@ export default function PaymentsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        title="Xác nhận xóa Giao dịch Thanh toán"
+        message={`Bạn có chắc muốn xóa Giao dịch Thanh toán #${deleteConfirm.id}? Thao tác này không thể hoàn tác.`}
+        confirmText="Xóa giao dịch"
+        cancelText="Hủy bỏ"
+        variant="danger"
+        loading={deleteConfirm.loading}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteConfirm({ isOpen: false, id: null, loading: false })}
+      />
     </div>
   )
 }

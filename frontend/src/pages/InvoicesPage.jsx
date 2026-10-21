@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { invoicesApi, membersApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
-import { ActionMenu, ManagementHeader, ManagementTable } from '../components/ManagementUI'
+import { ActionMenu, ManagementHeader, ManagementTable, ManagementFilterBar } from '../components/ManagementUI'
 import { formatVnd } from '../components/managementUtils'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function InvoicesPage() {
   const { isAdmin } = useAuth()
@@ -12,6 +13,11 @@ export default function InvoicesPage() {
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, id: null, loading: false })
 
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -100,17 +106,52 @@ export default function InvoicesPage() {
     }
   }
 
-  const handleDelete = async (id) => {
-    if (!window.confirm(`Bạn có chắc muốn xóa Hóa đơn ID #${id}?`)) return
+  const handleOpenDelete = (id) => {
+    setDeleteConfirm({ isOpen: true, id, loading: false })
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirm.id) return
+    setDeleteConfirm((prev) => ({ ...prev, loading: true }))
     try {
-      await invoicesApi.delete(id)
+      await invoicesApi.delete(deleteConfirm.id)
+      setDeleteConfirm({ isOpen: false, id: null, loading: false })
       fetchData()
     } catch (err) {
-      alert('Lỗi xóa: ' + (err.response?.data?.detail || err.message))
+      setDeleteConfirm({ isOpen: false, id: null, loading: false })
+      setError('Lỗi xóa: ' + (err.response?.data?.detail || err.message))
     }
   }
 
-  const memberMap = Object.fromEntries(members.map((m) => [m.id, m]))
+  const memberMap = useMemo(() => Object.fromEntries(members.map((m) => [m.id, m])), [members])
+
+  const statusOptions = [
+    { value: 'all', label: 'Tất cả trạng thái' },
+    { value: 'pending', label: 'pending (Chờ thanh toán)' },
+    { value: 'partially_paid', label: 'partially_paid (Thanh toán 1 phần)' },
+    { value: 'paid', label: 'paid (Đã hoàn tất)' },
+    { value: 'cancelled', label: 'cancelled (Đã hủy)' },
+  ]
+
+  const filteredInvoices = useMemo(() => {
+    return invoices.filter((inv) => {
+      const q = searchTerm.trim().toLowerCase()
+      const member = inv.member || memberMap[inv.member_id]
+      const matchSearch =
+        !q ||
+        (member?.full_name && member.full_name.toLowerCase().includes(q)) ||
+        (member?.email && member.email.toLowerCase().includes(q)) ||
+        String(inv.id).includes(q) ||
+        `hđ #${inv.id}`.toLowerCase().includes(q)
+      const matchStatus = statusFilter === 'all' || inv.status === statusFilter
+      return matchSearch && matchStatus
+    })
+  }, [invoices, searchTerm, statusFilter, memberMap])
+
+  const handleResetFilter = () => {
+    setSearchTerm('')
+    setStatusFilter('all')
+  }
 
   return (
     <div>
@@ -120,6 +161,7 @@ export default function InvoicesPage() {
         onRefresh={fetchData}
         onAdd={isAdmin ? handleOpenAdd : undefined}
         addLabel="Tạo hóa đơn"
+        count={invoices.length}
       />
 
       {error && (
@@ -127,6 +169,19 @@ export default function InvoicesPage() {
           <i className="bi bi-exclamation-circle me-2"></i> {error}
         </div>
       )}
+
+      <ManagementFilterBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Tìm theo mã HĐ, tên hoặc email hội viên..."
+        filterValue={statusFilter}
+        onFilterChange={setStatusFilter}
+        filterOptions={statusOptions}
+        filterLabel="Lọc theo trạng thái hóa đơn"
+        totalCount={invoices.length}
+        filteredCount={filteredInvoices.length}
+        onReset={handleResetFilter}
+      />
 
       <ManagementTable
         columns={[
@@ -140,11 +195,23 @@ export default function InvoicesPage() {
         ]}
         loading={loading}
         loadingMessage="Đang tải dữ liệu Hóa đơn..."
-        isEmpty={invoices.length === 0}
-        emptyMessage="Chưa có dữ liệu hóa đơn nào"
+        isEmpty={invoices.length === 0 || filteredInvoices.length === 0}
+        emptyMessage={invoices.length === 0 ? 'Chưa có dữ liệu hóa đơn nào' : 'Không tìm thấy hóa đơn nào phù hợp với bộ lọc'}
+        emptyIcon={invoices.length === 0 ? 'bi-inbox' : 'bi-search'}
+        emptyAction={
+          invoices.length > 0 && filteredInvoices.length === 0 ? (
+            <button
+              type="button"
+              className="management-secondary-button mt-3"
+              onClick={handleResetFilter}
+            >
+              <i className="bi bi-arrow-counterclockwise"></i> Đặt lại bộ lọc
+            </button>
+          ) : null
+        }
         minWidth={1020}
       >
-        {invoices.map((inv) => {
+        {filteredInvoices.map((inv) => {
           const member = inv.member || memberMap[inv.member_id]
           return (
             <tr key={inv.id}>
@@ -161,7 +228,7 @@ export default function InvoicesPage() {
               </td>
               {isAdmin && (
                 <td className="text-end">
-                  <ActionMenu onEdit={() => handleOpenEdit(inv)} onDelete={() => handleDelete(inv.id)} />
+                  <ActionMenu onEdit={() => handleOpenEdit(inv)} onDelete={() => handleOpenDelete(inv.id)} />
                 </td>
               )}
             </tr>
@@ -171,14 +238,21 @@ export default function InvoicesPage() {
 
 
       {showModal && (
-        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div
+          className="modal show d-block"
+          tabIndex="-1"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="invoice-modal-title"
+          style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}
+        >
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content border-0 shadow">
               <div className="modal-header">
-                <h5 className="modal-title fw-bold">
+                <h5 className="modal-title fw-bold" id="invoice-modal-title">
                   {editingId ? `Cập nhật Hóa đơn #${editingId}` : 'Tạo mới Hóa đơn'}
                 </h5>
-                <button type="button" className="btn-close" onClick={handleCloseModal}></button>
+                <button type="button" className="btn-close" onClick={handleCloseModal} aria-label="Đóng"></button>
               </div>
               <form onSubmit={handleSave}>
                 <div className="modal-body">
@@ -188,8 +262,9 @@ export default function InvoicesPage() {
                     </div>
                   )}
                   <div className="mb-3">
-                    <label className="form-label small fw-bold">Chọn Hội viên</label>
+                    <label htmlFor="invoice-member-select" className="form-label small fw-bold">Chọn Hội viên</label>
                     <select
+                      id="invoice-member-select"
                       className="form-select"
                       value={formData.member_id}
                       onChange={(e) => setFormData({ ...formData, member_id: e.target.value })}
@@ -205,8 +280,9 @@ export default function InvoicesPage() {
                   </div>
                   <div className="row g-2 mb-3">
                     <div className="col-md-6">
-                      <label className="form-label small fw-bold">Tổng tiền (VNĐ)</label>
+                      <label htmlFor="invoice-amount" className="form-label small fw-bold">Tổng tiền (VNĐ)</label>
                       <input
+                        id="invoice-amount"
                         type="number"
                         min="1000"
                         step="1000"
@@ -217,8 +293,9 @@ export default function InvoicesPage() {
                       />
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label small fw-bold">Đã thanh toán (VNĐ)</label>
+                      <label htmlFor="invoice-amount-paid" className="form-label small fw-bold">Đã thanh toán (VNĐ)</label>
                       <input
+                        id="invoice-amount-paid"
                         type="number"
                         min="0"
                         step="1000"
@@ -230,8 +307,9 @@ export default function InvoicesPage() {
                     </div>
                   </div>
                   <div className="mb-2">
-                    <label className="form-label small fw-bold">Trạng thái thanh toán</label>
+                    <label htmlFor="invoice-status" className="form-label small fw-bold">Trạng thái thanh toán</label>
                     <select
+                      id="invoice-status"
                       className="form-select"
                       value={formData.status}
                       onChange={(e) => setFormData({ ...formData, status: e.target.value })}
@@ -244,10 +322,10 @@ export default function InvoicesPage() {
                   </div>
                 </div>
                 <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={handleCloseModal}>
+                  <button type="button" className="management-secondary-button" onClick={handleCloseModal}>
                     Hủy
                   </button>
-                  <button type="submit" className="btn btn-primary btn-sm" disabled={submitting}>
+                  <button type="submit" className="management-primary-button" disabled={submitting}>
                     {submitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Thêm mới')}
                   </button>
                 </div>
@@ -256,6 +334,18 @@ export default function InvoicesPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        title="Xác nhận xóa Hóa đơn"
+        message={`Bạn có chắc muốn xóa Hóa đơn #${deleteConfirm.id}? Dữ liệu thanh toán liên quan có thể bị ảnh hưởng.`}
+        confirmText="Xóa hóa đơn"
+        cancelText="Hủy bỏ"
+        variant="danger"
+        loading={deleteConfirm.loading}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteConfirm({ isOpen: false, id: null, loading: false })}
+      />
     </div>
   )
 }
