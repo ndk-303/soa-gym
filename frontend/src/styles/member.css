@@ -264,13 +264,6 @@
   background: var(--color-primary-subtle);
 }
 
-.member-dashboard .kpi-group-tag {
-  color: var(--color-primary);
-}
-
-.member-dashboard .kpi-card-value[style] {
-  color: var(--text-primary) !important;
-}
 
 .member-dashboard .calendar-month-title i,
 .member-dashboard .calendar-day-slot.is-today .calendar-day-number {

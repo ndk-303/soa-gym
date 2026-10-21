@@ -16,10 +16,8 @@ export default function Navbar({ onMenuToggle }) {
       </div>
 
       <div className="app-navbar-meta">
-
         <span
-          className="admin-avatar"
-          style={{ backgroundColor: isAdmin ? '#2563eb' : '#10b981' }}
+          className={`admin-avatar ${isAdmin ? 'is-admin' : 'is-member'}`}
           title={user?.email}
         >
           {isAdmin ? 'A' : 'M'}

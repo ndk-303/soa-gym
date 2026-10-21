@@ -128,7 +128,6 @@ export default function Dashboard({ onTabChange }) {
 
       {/* Quick Action Navigation */}
       <div className="quick-actions-bar">
-        <span className="quick-actions-label"><i className="bi bi-lightning-charge me-1"></i>Truy cập nhanh:</span>
         <button type="button" className="quick-action-btn" onClick={() => onTabChange('members')}>
           <i className="bi bi-person-plus"></i> Thêm hội viên
         </button>
@@ -154,7 +153,6 @@ export default function Dashboard({ onTabChange }) {
           >
             <div className="kpi-card-top">
               <span className="kpi-icon"><i className={`bi ${c.icon}`}></i></span>
-              <span className="kpi-group-tag">{c.group}</span>
             </div>
             <div>
               <div className="kpi-card-value">

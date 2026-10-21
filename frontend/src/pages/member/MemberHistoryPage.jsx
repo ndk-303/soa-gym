@@ -60,7 +60,6 @@ export default function MemberHistoryPage({ currentMember }) {
         <div className="kpi-card">
           <div className="kpi-card-top">
             <span className="kpi-icon"><i className="bi bi-wallet2"></i></span>
-            <span className="kpi-group-tag">Chi tiêu</span>
           </div>
           <div>
             <div className="kpi-card-value" style={{ color: 'var(--color-primary)' }}>
@@ -72,7 +71,6 @@ export default function MemberHistoryPage({ currentMember }) {
         <div className="kpi-card">
           <div className="kpi-card-top">
             <span className="kpi-icon"><i className="bi bi-receipt"></i></span>
-            <span className="kpi-group-tag">Giao dịch</span>
           </div>
           <div>
             <div className="kpi-card-value">

@@ -161,10 +161,13 @@ export default function MemberDashboard({ onTabChange, currentMember, memberLoad
       {/* 4 Metric Cards */}
       <div className="kpi-grid">
         {/* Card 1: Gói tập hiện tại */}
-        <div className="kpi-card" onClick={() => onTabChange('plans')} role="button" tabIndex={0}>
+        <button
+          type="button"
+          className="kpi-card text-start"
+          onClick={() => onTabChange('plans')}
+        >
           <div className="kpi-card-top">
             <span className="kpi-icon"><i className="bi bi-card-checklist"></i></span>
-            <span className="kpi-group-tag">Thẻ hội viên</span>
           </div>
           <div>
             <div className="kpi-card-value" style={{ fontSize: '20px', lineHeight: 1.3 }}>
@@ -175,13 +178,12 @@ export default function MemberDashboard({ onTabChange, currentMember, memberLoad
               <StatusBadge status={currentMember?.status || (currentPlan ? 'active' : 'inactive')} />
             </div>
           </div>
-        </div>
+        </button>
 
         {/* Card 2: Số ngày đã tập */}
         <div className="kpi-card">
           <div className="kpi-card-top">
             <span className="kpi-icon"><i className="bi bi-check2-all"></i></span>
-            <span className="kpi-group-tag">Check-in</span>
           </div>
           <div>
             <div className="kpi-card-value" style={{ color: 'var(--color-success)' }}>
@@ -197,7 +199,6 @@ export default function MemberDashboard({ onTabChange, currentMember, memberLoad
         <div className="kpi-card">
           <div className="kpi-card-top">
             <span className="kpi-icon"><i className="bi bi-hourglass-split"></i></span>
-            <span className="kpi-group-tag">Hiệu lực</span>
           </div>
           <div>
             <div
@@ -222,7 +223,6 @@ export default function MemberDashboard({ onTabChange, currentMember, memberLoad
         <div className="kpi-card">
           <div className="kpi-card-top">
             <span className="kpi-icon"><i className="bi bi-calendar-event"></i></span>
-            <span className="kpi-group-tag">Hết hạn</span>
           </div>
           <div>
             <div className="kpi-card-value" style={{ fontSize: '20px' }}>
