@@ -182,12 +182,19 @@ export default function MemberPlansPage({ currentMember, onMemberRefresh, onTabC
 
       {/* Confirmation Modal with Design System tokens */}
       {selectedPlan && (
-        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}>
+        <div
+          className="modal show d-block"
+          tabIndex="-1"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="plan-confirm-modal-title"
+          style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}
+        >
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content border-0">
               <div className="modal-header">
-                <h3 className="modal-title">Xác nhận Đăng ký Gói tập</h3>
-                <button type="button" className="btn-close" onClick={handleCloseModal}></button>
+                <h3 className="modal-title" id="plan-confirm-modal-title">Xác nhận Đăng ký Gói tập</h3>
+                <button type="button" className="btn-close" onClick={handleCloseModal} aria-label="Đóng"></button>
               </div>
               <div className="modal-body">
                 {registerSuccess ? (

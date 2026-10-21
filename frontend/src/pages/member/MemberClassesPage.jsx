@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { classesApi, slotsApi, bookingsApi } from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import StatusBadge from '../../components/StatusBadge'
 import { formatSchedule } from '../../components/managementUtils'
+import ConfirmDialog from '../../components/ConfirmDialog'
 
 export default function MemberClassesPage({ currentMember }) {
   const [activeTab, setActiveTab] = useState('explore') // 'explore' | 'my-classes'
@@ -13,10 +14,15 @@ export default function MemberClassesPage({ currentMember }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
+  const [searchTerm, setSearchTerm] = useState('')
+
   // Booking action state
   const [bookingSlotId, setBookingSlotId] = useState(null)
   const [actionSuccess, setActionSuccess] = useState(null)
   const [actionError, setActionError] = useState(null)
+
+  // Cancel confirmation modal state
+  const [cancelConfirm, setCancelConfirm] = useState({ isOpen: false, id: null, loading: false })
 
   const memberId = currentMember?.id
 
@@ -77,16 +83,23 @@ export default function MemberClassesPage({ currentMember }) {
     }
   }
 
-  const handleCancelBooking = async (bookingId) => {
-    if (!window.confirm('Bạn có chắc muốn hủy đặt chỗ ca học này?')) return
+  const handleOpenCancel = (bookingId) => {
+    setCancelConfirm({ isOpen: true, id: bookingId, loading: false })
+  }
+
+  const handleConfirmCancel = async () => {
+    if (!cancelConfirm.id) return
+    setCancelConfirm((prev) => ({ ...prev, loading: true }))
     setActionError(null)
     setActionSuccess(null)
     try {
-      await bookingsApi.delete(bookingId)
+      await bookingsApi.delete(cancelConfirm.id)
+      setCancelConfirm({ isOpen: false, id: null, loading: false })
       setActionSuccess('Đã hủy đặt chỗ thành công!')
       await fetchData()
       setTimeout(() => setActionSuccess(null), 3000)
     } catch (err) {
+      setCancelConfirm({ isOpen: false, id: null, loading: false })
       setActionError(err.response?.data?.detail || err.message || 'Lỗi hủy đặt chỗ')
       setTimeout(() => setActionError(null), 4000)
     }
@@ -109,6 +122,16 @@ export default function MemberClassesPage({ currentMember }) {
     }
     return counts
   }, {})
+
+  const filteredClasses = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase()
+    if (!q) return classes
+    return classes.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        (c.category && c.category.toLowerCase().includes(q))
+    )
+  }, [classes, searchTerm])
 
   return (
     <div className="member-classes-page">
@@ -167,16 +190,79 @@ export default function MemberClassesPage({ currentMember }) {
         <LoadingSpinner message="Đang tải danh sách lớp học..." />
       ) : activeTab === 'explore' ? (
         /* Tab 1: Khám phá lớp học dạng Card */
-        <div className="member-cards-grid">
-          {classes.length === 0 ? (
-            <div style={{ gridColumn: '1 / -1' }}>
-              <div className="management-empty">
-                <i className="bi bi-calendar-x"></i>
-                <p>Hiện chưa có lớp học nào khả dụng</p>
+        <>
+          {classes.length > 0 && (
+            <div className="management-filter-bar mb-3">
+              <div className="management-filter-inputs">
+                <div className="management-search-wrapper" style={{ maxWidth: 360 }}>
+                  <i className="bi bi-search management-search-icon" aria-hidden="true"></i>
+                  <input
+                    type="search"
+                    className="management-search-input"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Tìm kiếm lớp học hoặc bộ môn..."
+                    aria-label="Tìm kiếm lớp học hoặc bộ môn"
+                  />
+                  {searchTerm && (
+                    <button
+                      type="button"
+                      className="management-search-clear"
+                      onClick={() => setSearchTerm('')}
+                      aria-label="Xóa từ khóa tìm kiếm"
+                    >
+                      <i className="bi bi-x"></i>
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="management-filter-summary">
+                {searchTerm.trim() ? (
+                  <>
+                    <span className="management-filter-count">
+                      Hiển thị <strong>{filteredClasses.length}</strong> / {classes.length} lớp học
+                    </span>
+                    <button
+                      type="button"
+                      className="management-reset-button"
+                      onClick={() => setSearchTerm('')}
+                    >
+                      <i className="bi bi-arrow-counterclockwise"></i> Đặt lại
+                    </button>
+                  </>
+                ) : (
+                  <span className="management-filter-count is-muted">
+                    Tổng cộng: <strong>{classes.length}</strong> lớp học
+                  </span>
+                )}
               </div>
             </div>
-          ) : (
-            classes.map((c) => {
+          )}
+
+          <div className="member-cards-grid">
+            {classes.length === 0 ? (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <div className="management-empty">
+                  <i className="bi bi-calendar-x"></i>
+                  <p>Hiện chưa có lớp học nào khả dụng</p>
+                </div>
+              </div>
+            ) : filteredClasses.length === 0 ? (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <div className="management-empty">
+                  <i className="bi bi-search"></i>
+                  <p>Không tìm thấy lớp học nào phù hợp với &quot;{searchTerm}&quot;</p>
+                  <button
+                    type="button"
+                    className="management-secondary-button mt-3"
+                    onClick={() => setSearchTerm('')}
+                  >
+                    <i className="bi bi-arrow-counterclockwise"></i> Xem tất cả lớp học
+                  </button>
+                </div>
+              </div>
+            ) : (
+              filteredClasses.map((c) => {
               // Get slots for this class
               const classSlots = slots.filter((s) => Number(s.class_id) === Number(c.id) && !s.is_cancelled)
 
@@ -195,7 +281,7 @@ export default function MemberClassesPage({ currentMember }) {
 
                     <h2 className="member-plan-title mb-3">{c.name}</h2>
 
-                    <div className="small fw-bold text-secondary text-uppercase mb-2" style={{ letterSpacing: '0.04em' }}>
+                    <div className="fw-semibold text-secondary mb-2" style={{ fontSize: '13px' }}>
                       Lịch ca tập sắp tới:
                     </div>
 
@@ -257,6 +343,7 @@ export default function MemberClassesPage({ currentMember }) {
             })
           )}
         </div>
+        </>
       ) : (
         /* Tab 2: Lớp học đã đăng ký của tôi */
         <div>
@@ -315,7 +402,7 @@ export default function MemberClassesPage({ currentMember }) {
                             <button
                               type="button"
                               className="row-action-button is-danger"
-                              onClick={() => handleCancelBooking(b.id)}
+                              onClick={() => handleOpenCancel(b.id)}
                             >
                               <i className="bi bi-trash3"></i>
                               <span>Hủy chỗ</span>
@@ -331,6 +418,18 @@ export default function MemberClassesPage({ currentMember }) {
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={cancelConfirm.isOpen}
+        title="Xác nhận hủy đặt chỗ lớp học"
+        message="Bạn có chắc chắn muốn hủy đặt chỗ cho ca tập này? Suất đặt sẽ được giải phóng cho các hội viên khác."
+        confirmText="Hủy đặt chỗ"
+        cancelText="Giữ lại"
+        variant="danger"
+        loading={cancelConfirm.loading}
+        onConfirm={handleConfirmCancel}
+        onCancel={() => setCancelConfirm({ isOpen: false, id: null, loading: false })}
+      />
     </div>
   )
 }
