@@ -5,6 +5,7 @@ export default function LoginPage() {
   const { login, loading } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
 
   const handleSubmit = async (e) => {
@@ -76,13 +77,22 @@ export default function LoginPage() {
                   <i className="bi bi-lock"></i>
                 </span>
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   className="form-control border-start-0 ps-0"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
+                <button
+                  type="button"
+                  className="btn bg-white border border-start-0 shadow-none text-muted"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                >
+                  <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`} aria-hidden="true"></i>
+                </button>
               </div>
             </div>
 

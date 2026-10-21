@@ -238,3 +238,53 @@
   color: var(--color-success);
 }
 
+/* Member portal: a quieter, single-accent palette while preserving the existing outlines. */
+.member-dashboard .dashboard-header h1,
+.member-dashboard .kpi-card-value,
+.member-dashboard .calendar-month-title,
+.member-dashboard .calendar-day-number {
+  color: var(--text-primary);
+}
+
+.member-dashboard .refresh-button,
+.member-dashboard .calendar-nav-btn {
+  color: var(--text-secondary);
+  background: var(--surface);
+}
+
+.member-dashboard .refresh-button:hover:not(:disabled),
+.member-dashboard .calendar-nav-btn:hover,
+.member-dashboard .calendar-nav-btn.is-today {
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.member-dashboard .kpi-icon {
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.member-dashboard .kpi-group-tag {
+  color: var(--color-primary);
+}
+
+.member-dashboard .kpi-card-value[style] {
+  color: var(--text-primary) !important;
+}
+
+.member-dashboard .calendar-month-title i,
+.member-dashboard .calendar-day-slot.is-today .calendar-day-number {
+  color: var(--color-primary);
+}
+
+.member-dashboard .calendar-stat-tag,
+.member-dashboard .calendar-checkin-badge {
+  color: var(--text-secondary);
+  background: var(--color-border-subtle);
+  border-color: var(--border-color);
+}
+
+.member-dashboard .calendar-day-slot.is-checked-in {
+  background: var(--color-primary-subtle);
+}
+

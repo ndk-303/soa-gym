@@ -8,6 +8,7 @@ export default function MemberClassesPage({ currentMember }) {
   const [activeTab, setActiveTab] = useState('explore') // 'explore' | 'my-classes'
   const [classes, setClasses] = useState([])
   const [slots, setSlots] = useState([])
+  const [allBookings, setAllBookings] = useState([])
   const [myBookings, setMyBookings] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -36,6 +37,7 @@ export default function MemberClassesPage({ currentMember }) {
 
       setClasses(classesData)
       setSlots(slotsData)
+      setAllBookings(bookingsData)
 
       // Filter bookings for current member
       const memberBookings = bookingsData.filter(
@@ -96,6 +98,17 @@ export default function MemberClassesPage({ currentMember }) {
 
   // Set of slot_ids currently booked by this member
   const bookedSlotIds = new Set(myBookings.map((b) => Number(b.slot_id)))
+
+  // The booking service is the source of truth for occupied seats. The
+  // denormalized current_bookings value on a slot may be stale after a
+  // booking is created or cancelled.
+  const bookingCountBySlot = allBookings.reduce((counts, booking) => {
+    if (booking.status !== 'cancelled') {
+      const slotId = Number(booking.slot_id)
+      counts[slotId] = (counts[slotId] || 0) + 1
+    }
+    return counts
+  }, {})
 
   return (
     <div className="member-classes-page">
@@ -194,9 +207,10 @@ export default function MemberClassesPage({ currentMember }) {
                       <div className="d-flex flex-column gap-2 mb-3">
                         {classSlots.map((s) => {
                           const isBooked = bookedSlotIds.has(Number(s.id))
-                          const isFull = s.current_bookings >= s.max_capacity
+                          const currentBookings = bookingCountBySlot[Number(s.id)] || 0
+                          const isFull = currentBookings >= s.max_capacity
                           const schedule = formatSchedule(s.start_time)
-                          const capacityPct = Math.min(100, Math.round(((s.current_bookings || 0) / (s.max_capacity || 1)) * 100))
+                          const capacityPct = Math.min(100, Math.round((currentBookings / (s.max_capacity || 1)) * 100))
 
                           return (
                             <div key={s.id} className="member-slot-item">
@@ -207,7 +221,7 @@ export default function MemberClassesPage({ currentMember }) {
                                   <span style={{ width: `${capacityPct}%` }}></span>
                                 </div>
                                 <div className="capacity-label" style={{ fontSize: '11px', marginTop: '4px' }}>
-                                  <span>Chỗ: <strong>{s.current_bookings}/{s.max_capacity}</strong></span>
+                                  <span>Chỗ: <strong>{currentBookings}/{s.max_capacity}</strong></span>
                                 </div>
                               </div>
 
