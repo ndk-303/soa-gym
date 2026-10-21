@@ -28,6 +28,89 @@ export function ManagementHeader({ title, description, onRefresh, onAdd, addLabe
   )
 }
 
+export function ManagementFilterBar({
+  searchTerm = '',
+  onSearchChange,
+  searchPlaceholder = 'Tìm kiếm nhanh...',
+  filterValue = 'all',
+  onFilterChange,
+  filterOptions = [],
+  filterLabel = 'Lọc theo trạng thái',
+  totalCount = 0,
+  filteredCount = 0,
+  onReset,
+}) {
+  const isFiltered = Boolean(searchTerm.trim() || (filterValue && filterValue !== 'all'))
+
+  return (
+    <div className="management-filter-bar">
+      <div className="management-filter-inputs">
+        <div className="management-search-wrapper">
+          <i className="bi bi-search management-search-icon" aria-hidden="true"></i>
+          <input
+            type="search"
+            className="management-search-input"
+            value={searchTerm}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder={searchPlaceholder}
+            aria-label={searchPlaceholder}
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              className="management-search-clear"
+              onClick={() => onSearchChange('')}
+              aria-label="Xóa từ khóa tìm kiếm"
+            >
+              <i className="bi bi-x"></i>
+            </button>
+          )}
+        </div>
+
+        {filterOptions.length > 0 && (
+          <div className="management-select-wrapper">
+            <select
+              className="management-filter-select"
+              value={filterValue}
+              onChange={(e) => onFilterChange(e.target.value)}
+              aria-label={filterLabel}
+            >
+              {filterOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      <div className="management-filter-summary">
+        {isFiltered ? (
+          <>
+            <span className="management-filter-count">
+              Hiển thị <strong>{filteredCount}</strong> / {totalCount} bản ghi
+            </span>
+            {onReset && (
+              <button
+                type="button"
+                className="management-reset-button"
+                onClick={onReset}
+              >
+                <i className="bi bi-arrow-counterclockwise"></i> Đặt lại
+              </button>
+            )}
+          </>
+        ) : (
+          <span className="management-filter-count is-muted">
+            Tổng số: <strong>{totalCount}</strong> bản ghi
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 const alignmentClasses = {
   left: 'is-left',
   center: 'is-center',
@@ -40,6 +123,8 @@ export function ManagementTable({
   loadingMessage,
   isEmpty,
   emptyMessage = 'Chưa có dữ liệu nào',
+  emptyIcon = 'bi-inbox',
+  emptyAction,
   children,
   minWidth = 760,
   className = '',
@@ -51,8 +136,9 @@ export function ManagementTable({
           <LoadingSpinner message={loadingMessage} />
         ) : isEmpty ? (
           <div className="management-empty">
-            <i className="bi bi-inbox"></i>
+            <i className={`bi ${emptyIcon}`}></i>
             <p>{emptyMessage}</p>
+            {emptyAction}
           </div>
         ) : (
           <table
