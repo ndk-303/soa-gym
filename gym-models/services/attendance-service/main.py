@@ -86,17 +86,6 @@ async def update_attendance(db: db_dependency, id: int, attendance_request: Atte
     db.refresh(record)
     return record
 
-
-@app.delete("/attendance/{id}")
-async def delete_attendance(db: db_dependency, id: int):
-    record = db.query(AttendanceRecord).filter(AttendanceRecord.id == id).first()
-    if record is None:
-        raise HTTPException(status_code=404, detail="Attendance record not found")
-    db.delete(record)
-    db.commit()
-    return {"message": "Attendance record deleted successfully"}
-
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host=settings.HOST, port=settings.service_port, reload=settings.ENVIRONMENT == "development")
