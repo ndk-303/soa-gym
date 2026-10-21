@@ -25,68 +25,99 @@ export default function LoginPage() {
     }
   }
 
-  const handleFillAccount = (accEmail, accPass) => {
-    setEmail(accEmail)
-    setPassword(accPass)
-    setError('')
-  }
-
   return (
-    <div className="d-flex align-items-center justify-content-center min-vh-100 p-3" style={{ backgroundColor: '#f1f5f9' }}>
-      <div className="card shadow-sm border-0" style={{ maxWidth: '440px', width: '100%', borderRadius: '16px', overflow: 'hidden' }}>
-        <div className="card-header bg-white border-0 pt-4 pb-2 text-center">
-          <div className="d-inline-flex align-items-center justify-content-center p-2 rounded-circle bg-light mb-2" style={{ width: '64px', height: '64px' }}>
-            <img src="/logo.svg" alt="SOA Gym Center" style={{ width: '40px', height: '40px' }} />
+    <div
+      className="d-flex align-items-center justify-content-center min-vh-100 p-3"
+      style={{ backgroundColor: 'var(--page-background)' }}
+    >
+      <div
+        style={{
+          maxWidth: '420px',
+          width: '100%',
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: 'var(--surface)',
+          border: '1px solid var(--border-color)',
+          boxShadow: 'var(--shadow-md)',
+          overflow: 'hidden',
+        }}
+      >
+        <div className="pt-4 pb-2 px-4 text-center">
+          <div
+            className="d-inline-flex align-items-center justify-content-center mb-2"
+            style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--color-primary-subtle)',
+              border: '1px solid var(--color-primary-border)',
+            }}
+          >
+            <img src="/logo.svg" alt="SOA Gym Center" style={{ width: '34px', height: '34px' }} />
           </div>
-          <h4 className="fw-bold text-dark mb-1">SOA Gym Center</h4>
-          <p className="text-muted small mb-0">Hệ thống Quản lý Phòng Gym</p>
+          <h1 className="fw-bold mb-1" style={{ fontSize: '22px', color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+            SOA Gym Center
+          </h1>
+          <p className="mb-0" style={{ color: 'var(--text-secondary)', fontSize: '13.5px' }}>
+            Hệ thống Quản lý Vận hành Phòng Gym
+          </p>
         </div>
 
-        <div className="card-body p-4">
-          <h5 className="card-title fw-semibold text-secondary mb-3 text-center">Đăng nhập</h5>
+        <div className="p-4 pt-3">
+          <h2 className="fw-bold mb-3 text-center" style={{ fontSize: '16px', color: 'var(--text-primary)' }}>
+            Đăng nhập tài khoản
+          </h2>
 
           {error && (
-            <div className="alert alert-danger d-flex align-items-center py-2 px-3 small rounded-3 " role="alert">
-              <i className="bi bi-exclamation-triangle-fill me-2 fs-6"></i>
+            <div className="management-error mb-3" role="alert">
+              <i className="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
               <div>{error}</div>
             </div>
           )}
 
           <form onSubmit={handleSubmit}>
             <div className="mb-3">
-              <label className="form-label small fw-medium text-secondary">Email</label>
+              <label htmlFor="login-email" className="form-label small fw-semibold" style={{ color: 'var(--text-secondary)' }}>
+                Email đăng nhập
+              </label>
               <div className="input-group">
-                <span className="input-group-text bg-white border-end-0 text-muted">
+                <span className="input-group-text bg-white border-end-0" style={{ color: 'var(--text-muted)' }}>
                   <i className="bi bi-envelope"></i>
                 </span>
                 <input
+                  id="login-email"
                   type="email"
                   className="form-control border-start-0 ps-0"
                   placeholder="name@gym.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
                   required
                 />
               </div>
             </div>
 
             <div className="mb-4">
-              <label className="form-label small fw-medium text-secondary">Mật khẩu</label>
+              <label htmlFor="login-password" className="form-label small fw-semibold" style={{ color: 'var(--text-secondary)' }}>
+                Mật khẩu
+              </label>
               <div className="input-group">
-                <span className="input-group-text bg-white border-end-0 text-muted">
+                <span className="input-group-text bg-white border-end-0" style={{ color: 'var(--text-muted)' }}>
                   <i className="bi bi-lock"></i>
                 </span>
                 <input
+                  id="login-password"
                   type={showPassword ? 'text' : 'password'}
                   className="form-control border-start-0 ps-0"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
                   required
                 />
                 <button
                   type="button"
-                  className="btn bg-white border border-start-0 shadow-none text-muted"
+                  className="btn bg-white border border-start-0 shadow-none"
+                  style={{ color: 'var(--text-muted)', minWidth: '44px' }}
                   onClick={() => setShowPassword((visible) => !visible)}
                   aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                   title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
@@ -98,8 +129,9 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="btn btn-primary w-100 py-2 fw-medium rounded-3"
+              className="management-primary-button w-100 justify-content-center py-2"
               disabled={loading}
+              style={{ minHeight: '42px', fontSize: '14px' }}
             >
               {loading ? (
                 <>
