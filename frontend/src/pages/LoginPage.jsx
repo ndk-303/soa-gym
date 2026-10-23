@@ -54,10 +54,10 @@ export default function LoginPage() {
           >
             <img src="/logo.svg" alt="SOA Gym Center" style={{ width: '34px', height: '34px' }} />
           </div>
-          <h1 className="fw-bold mb-1" style={{ fontSize: '22px', color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+          <h1 className="fw-bold mb-1" style={{ fontSize: '26px', color: 'var(--text-primary)', letterSpacing: '-0.025em' }}>
             SOA Gym Center
           </h1>
-          <p className="mb-0" style={{ color: 'var(--text-secondary)', fontSize: '13.5px' }}>
+          <p className="mb-0" style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
             Hệ thống Quản lý Vận hành Phòng Gym
           </p>
         </div>

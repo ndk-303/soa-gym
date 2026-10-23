@@ -2,11 +2,13 @@ import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { slotsApi, classesApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
-import { ActionMenu, ManagementHeader, ManagementTable, ManagementFilterBar } from '../components/ManagementUI'
+import { ActionMenu, ManagementHeader, ManagementTable, ManagementFilterBar, ManagementModal } from '../components/ManagementUI'
 import { formatSchedule, toDatetimeLocalValue, fromDatetimeLocalValue, getNowDatetimeLocalValue } from '../components/managementUtils'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { useToast } from '../context/ToastContext'
 
 export default function SlotsPage() {
+  const toast = useToast()
   const { isAdmin } = useAuth()
   const [slots, setSlots] = useState([])
 
@@ -88,6 +90,28 @@ export default function SlotsPage() {
     e.preventDefault()
     setSubmitting(true)
     setFormError(null)
+
+    if (!formData.class_id) {
+      setFormError('Vui lòng chọn lớp học')
+      setSubmitting(false)
+      return
+    }
+    if (!formData.start_time) {
+      setFormError('Vui lòng chọn thời gian bắt đầu ca tập')
+      setSubmitting(false)
+      return
+    }
+    if (!formData.max_capacity || Number(formData.max_capacity) < 1) {
+      setFormError('Sức chứa tối đa phải từ 1 người trở lên')
+      setSubmitting(false)
+      return
+    }
+    if (Number(formData.current_bookings) > Number(formData.max_capacity)) {
+      setFormError('Số chỗ đã đặt không thể vượt quá sức chứa tối đa')
+      setSubmitting(false)
+      return
+    }
+
     try {
       const payload = {
         class_id: Number(formData.class_id),
@@ -98,8 +122,10 @@ export default function SlotsPage() {
       }
       if (editingId) {
         await slotsApi.update(editingId, payload)
+        toast.success('Cập nhật ca tập thành công')
       } else {
         await slotsApi.create(payload)
+        toast.success('Thêm mới ca tập thành công')
       }
       handleCloseModal()
       fetchData()
@@ -120,10 +146,13 @@ export default function SlotsPage() {
     try {
       await slotsApi.delete(deleteConfirm.id)
       setDeleteConfirm({ isOpen: false, id: null, loading: false })
+      toast.success('Đã xóa ca tập thành công')
       fetchData()
     } catch (err) {
       setDeleteConfirm({ isOpen: false, id: null, loading: false })
-      setError('Lỗi xóa: ' + (err.response?.data?.detail || err.message))
+      const errorMsg = 'Lỗi xóa: ' + (err.response?.data?.detail || err.message)
+      setError(errorMsg)
+      toast.error(errorMsg)
     }
   }
 
@@ -131,8 +160,8 @@ export default function SlotsPage() {
 
   const statusOptions = [
     { value: 'all', label: 'Tất cả trạng thái' },
-    { value: 'active', label: 'active (Khả dụng)' },
-    { value: 'cancelled', label: 'cancelled (Đã hủy)' },
+    { value: 'active', label: 'Đang mở (Khả dụng)' },
+    { value: 'cancelled', label: 'Đã hủy' },
   ]
 
   const filteredSlots = useMemo(() => {
@@ -162,11 +191,9 @@ export default function SlotsPage() {
     <div>
       <ManagementHeader
         title="Ca tập"
-        description="Lịch tập, sức chứa và số chỗ đã đăng ký theo từng lớp"
         onRefresh={fetchData}
         onAdd={isAdmin ? handleOpenAdd : undefined}
         addLabel="Thêm ca tập"
-        count={slots.length}
       />
 
       {error && (
@@ -189,12 +216,13 @@ export default function SlotsPage() {
       />
 
       <ManagementTable
+        minWidth={isAdmin ? 720 : 600}
         columns={[
-          { key: 'class', label: 'Lớp học', width: isAdmin ? '28%' : '35%' },
-          { key: 'start', label: 'Thời gian bắt đầu', width: isAdmin ? '18%' : '25%' },
-          { key: 'capacity', label: 'Sức chứa', width: isAdmin ? '19%' : '25%' },
-          { key: 'status', label: 'Trạng thái', width: isAdmin ? '15%' : '15%' },
-          ...(isAdmin ? [{ key: 'actions', label: 'Hành động', width: '190px', align: 'center' }] : []),
+          { key: 'class', label: 'Lớp học', width: isAdmin ? '28%' : '34%' },
+          { key: 'start', label: 'Thời gian bắt đầu', width: isAdmin ? '24%' : '28%' },
+          { key: 'capacity', label: 'Sức chứa', width: isAdmin ? '20%' : '22%' },
+          { key: 'status', label: 'Trạng thái', width: isAdmin ? '14%' : '16%' },
+          ...(isAdmin ? [{ key: 'actions', label: 'Hành động', width: '14%', align: 'center' }] : []),
         ]}
         loading={loading}
         loadingMessage="Đang tải dữ liệu Ca tập..."
@@ -231,7 +259,7 @@ export default function SlotsPage() {
                 <StatusBadge status={s.is_cancelled ? 'cancelled' : 'active'} />
               </td>
               {isAdmin && (
-                <td className="text-end">
+                <td className="text-center actions-cell">
                   <ActionMenu onEdit={() => handleOpenEdit(s)} onDelete={() => handleOpenDelete(s.id)} />
                 </td>
               )}
@@ -241,118 +269,105 @@ export default function SlotsPage() {
       </ManagementTable>
 
 
-      {showModal && (
-        <div
-          className="modal show d-block"
-          tabIndex="-1"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="slot-modal-title"
-          style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}
-        >
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content border-0 shadow">
-              <div className="modal-header">
-                <h5 id="slot-modal-title" className="modal-title fw-bold">
-                  {editingId ? `Cập nhật Ca tập #${editingId}` : 'Thêm mới Ca tập'}
-                </h5>
-                <button type="button" className="btn-close" onClick={handleCloseModal} aria-label="Đóng"></button>
+      <ManagementModal
+        isOpen={showModal}
+        onClose={handleCloseModal}
+        title={editingId ? `Cập nhật Ca tập #${editingId}` : 'Thêm mới Ca tập'}
+        titleId="slot-modal-title"
+        isSubmitting={submitting}
+      >
+        <form onSubmit={handleSave}>
+          <div className="modal-body">
+            {formError && (
+              <div className="alert alert-danger py-2 small mb-3">
+                <i className="bi bi-exclamation-triangle me-1"></i> {formError}
               </div>
-              <form onSubmit={handleSave}>
-                <div className="modal-body">
-                  {formError && (
-                    <div className="alert alert-danger py-2 small mb-3">
-                      <i className="bi bi-exclamation-triangle me-1"></i> {formError}
-                    </div>
-                  )}
-                  <div className="mb-3">
-                    <label htmlFor="slot-class-id" className="form-label small fw-bold">Chọn Lớp học</label>
-                    <select
-                      id="slot-class-id"
-                      className="form-select"
-                      value={formData.class_id}
-                      onChange={(e) => setFormData({ ...formData, class_id: e.target.value })}
-                      required
-                    >
-                      <option value="">-- Chọn lớp học --</option>
-                      {classes.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} ({c.category})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="mb-3">
-                    <label htmlFor="slot-start-time" className="form-label small fw-bold">Thời gian bắt đầu</label>
-                    <input
-                      id="slot-start-time"
-                      type="datetime-local"
-                      className="form-control"
-                      value={formData.start_time}
-                      onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="row g-2 mb-3">
-                    <div className="col-md-6">
-                      <label htmlFor="slot-max-capacity" className="form-label small fw-bold">Sức chứa tối đa</label>
-                      <input
-                        id="slot-max-capacity"
-                        type="number"
-                        min="1"
-                        max="100"
-                        className="form-control"
-                        value={formData.max_capacity}
-                        onChange={(e) => setFormData({ ...formData, max_capacity: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <label htmlFor="slot-current-bookings" className="form-label small fw-bold">Số chỗ đã đặt</label>
-                      <input
-                        id="slot-current-bookings"
-                        type="number"
-                        min="0"
-                        className="form-control"
-                        value={formData.current_bookings}
-                        onChange={(e) => setFormData({ ...formData, current_bookings: e.target.value })}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="form-check form-switch mb-2">
-                    <input
-                      className="form-check-input"
-                      type="checkbox"
-                      id="slotCancelledSwitch"
-                      checked={formData.is_cancelled}
-                      onChange={(e) => setFormData({ ...formData, is_cancelled: e.target.checked })}
-                    />
-                    <label className="form-check-label small" htmlFor="slotCancelledSwitch">
-                      Đã hủy ca tập
-                    </label>
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="management-secondary-button" onClick={handleCloseModal}>
-                    Hủy
-                  </button>
-                  <button type="submit" className="management-primary-button" disabled={submitting}>
-                    {submitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Thêm mới')}
-                  </button>
-                </div>
-              </form>
+            )}
+            <div className="mb-3">
+              <label htmlFor="slot-class-id" className="form-label small fw-bold">Chọn Lớp học</label>
+              <select
+                id="slot-class-id"
+                className="form-select"
+                value={formData.class_id}
+                onChange={(e) => setFormData({ ...formData, class_id: e.target.value })}
+                required
+              >
+                <option value="">-- Chọn lớp học --</option>
+                {classes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.category})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="mb-3">
+              <label htmlFor="slot-start-time" className="form-label small fw-bold">Thời gian bắt đầu</label>
+              <input
+                id="slot-start-time"
+                type="datetime-local"
+                className="form-control"
+                value={formData.start_time}
+                onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                required
+              />
+            </div>
+            <div className="row g-2 mb-3">
+              <div className="col-md-6">
+                <label htmlFor="slot-max-capacity" className="form-label small fw-bold">Sức chứa tối đa</label>
+                <input
+                  id="slot-max-capacity"
+                  type="number"
+                  min="1"
+                  max="100"
+                  className="form-control"
+                  value={formData.max_capacity}
+                  onChange={(e) => setFormData({ ...formData, max_capacity: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="col-md-6">
+                <label htmlFor="slot-current-bookings" className="form-label small fw-bold">Số chỗ đã đặt</label>
+                <input
+                  id="slot-current-bookings"
+                  type="number"
+                  min="0"
+                  className="form-control"
+                  value={formData.current_bookings}
+                  onChange={(e) => setFormData({ ...formData, current_bookings: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+            <div className="form-check form-switch mb-2">
+              <input
+                className="form-check-input"
+                type="checkbox"
+                id="slotCancelledSwitch"
+                checked={formData.is_cancelled}
+                onChange={(e) => setFormData({ ...formData, is_cancelled: e.target.checked })}
+              />
+              <label className="form-check-label small" htmlFor="slotCancelledSwitch">
+                Đã hủy ca tập
+              </label>
             </div>
           </div>
-        </div>
-      )}
+          <div className="modal-footer">
+            <button type="button" className="management-secondary-button" onClick={handleCloseModal} disabled={submitting}>
+              Hủy
+            </button>
+            <button type="submit" className="management-primary-button" disabled={submitting}>
+              {submitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Thêm mới')}
+            </button>
+          </div>
+        </form>
+      </ManagementModal>
 
       <ConfirmDialog
         isOpen={deleteConfirm.isOpen}
-        title="Xác nhận xóa Ca tập"
-        message={`Bạn có chắc muốn xóa Ca tập #${deleteConfirm.id}? Thao tác này sẽ hủy các lượt đặt chỗ thuộc ca tập này.`}
+        title="Xóa ca tập"
+        message={`Ca tập #${deleteConfirm.id} sẽ bị xóa vĩnh viễn khỏi lịch tập. Mọi suất đặt chỗ của hội viên trong ca này sẽ bị hủy bỏ.`}
         confirmText="Xóa ca tập"
-        cancelText="Hủy bỏ"
+        cancelText="Giữ lại"
         variant="danger"
         loading={deleteConfirm.loading}
         onConfirm={handleConfirmDelete}

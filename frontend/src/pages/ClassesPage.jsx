@@ -2,10 +2,12 @@ import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { classesApi, usersApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
-import { ActionMenu, ManagementHeader, ManagementTable, ManagementFilterBar } from '../components/ManagementUI'
+import { ActionMenu, ManagementHeader, ManagementTable, ManagementFilterBar, ManagementModal } from '../components/ManagementUI'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { useToast } from '../context/ToastContext'
 
 export default function ClassesPage() {
+  const toast = useToast()
   const { isAdmin } = useAuth()
   const [classes, setClasses] = useState([])
 
@@ -86,17 +88,34 @@ export default function ClassesPage() {
     e.preventDefault()
     setSubmitting(true)
     setFormError(null)
+
+    const cleanName = formData.name?.trim() || ''
+    const cleanCategory = formData.category?.trim() || ''
+
+    if (!cleanName) {
+      setFormError('Vui lòng nhập tên lớp học (ví dụ: Yoga Buổi Sáng)')
+      setSubmitting(false)
+      return
+    }
+    if (!formData.trainer_id) {
+      setFormError('Vui lòng chọn Huấn luyện viên phụ trách lớp học này')
+      setSubmitting(false)
+      return
+    }
+
     try {
       const payload = {
-        name: formData.name,
-        category: formData.category,
+        name: cleanName,
+        category: cleanCategory,
         trainer_id: Number(formData.trainer_id),
         is_active: Boolean(formData.is_active),
       }
       if (editingId) {
         await classesApi.update(editingId, payload)
+        toast.success('Cập nhật lớp học thành công')
       } else {
         await classesApi.create(payload)
+        toast.success('Thêm mới lớp học thành công')
       }
       handleCloseModal()
       fetchData()
@@ -117,10 +136,13 @@ export default function ClassesPage() {
     try {
       await classesApi.delete(deleteConfirm.id)
       setDeleteConfirm({ isOpen: false, id: null, loading: false })
+      toast.success('Đã xóa lớp học thành công')
       fetchData()
     } catch (err) {
       setDeleteConfirm({ isOpen: false, id: null, loading: false })
-      setError('Lỗi xóa: ' + (err.response?.data?.detail || err.message))
+      const errorMsg = 'Lỗi xóa: ' + (err.response?.data?.detail || err.message)
+      setError(errorMsg)
+      toast.error(errorMsg)
     }
   }
 
@@ -158,11 +180,9 @@ export default function ClassesPage() {
     <div>
       <ManagementHeader
         title="Lớp học"
-        description="Quản lý bộ môn, huấn luyện viên và trạng thái lớp học"
         onRefresh={fetchData}
         onAdd={isAdmin ? handleOpenAdd : undefined}
         addLabel="Thêm lớp học"
-        count={classes.length}
       />
 
       {error && (
@@ -185,12 +205,13 @@ export default function ClassesPage() {
       />
 
       <ManagementTable
+        minWidth={isAdmin ? 720 : 600}
         columns={[
-          { key: 'name', label: 'Tên lớp', width: isAdmin ? '28%' : '35%' },
-          { key: 'category', label: 'Bộ môn', width: isAdmin ? '18%' : '25%' },
-          { key: 'trainer', label: 'Huấn luyện viên', width: isAdmin ? '19%' : '25%' },
-          { key: 'status', label: 'Trạng thái', width: isAdmin ? '15%' : '15%' },
-          ...(isAdmin ? [{ key: 'actions', label: 'Hành động', width: '190px', align: 'center' }] : []),
+          { key: 'name', label: 'Tên lớp', width: isAdmin ? '28%' : '34%' },
+          { key: 'category', label: 'Bộ môn', width: isAdmin ? '20%' : '24%' },
+          { key: 'trainer', label: 'Huấn luyện viên', width: isAdmin ? '24%' : '26%' },
+          { key: 'status', label: 'Trạng thái', width: isAdmin ? '14%' : '16%' },
+          ...(isAdmin ? [{ key: 'actions', label: 'Hành động', width: '14%', align: 'center' }] : []),
         ]}
         loading={loading}
         loadingMessage="Đang tải dữ liệu Lớp học..."
@@ -222,7 +243,7 @@ export default function ClassesPage() {
                 <StatusBadge status={c.is_active ? 'active' : 'inactive'} />
               </td>
               {isAdmin && (
-                <td className="text-end">
+                <td className="text-center actions-cell">
                   <ActionMenu onEdit={() => handleOpenEdit(c)} onDelete={() => handleOpenDelete(c.id)} />
                 </td>
               )}
@@ -232,106 +253,93 @@ export default function ClassesPage() {
       </ManagementTable>
 
 
-      {showModal && (
-        <div
-          className="modal show d-block"
-          tabIndex="-1"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="class-modal-title"
-          style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}
-        >
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content border-0 shadow">
-              <div className="modal-header">
-                <h5 id="class-modal-title" className="modal-title fw-bold">
-                  {editingId ? `Cập nhật Lớp học #${editingId}` : 'Thêm mới Lớp học'}
-                </h5>
-                <button type="button" className="btn-close" onClick={handleCloseModal} aria-label="Đóng"></button>
+      <ManagementModal
+        isOpen={showModal}
+        onClose={handleCloseModal}
+        title={editingId ? `Cập nhật Lớp học #${editingId}` : 'Thêm mới Lớp học'}
+        titleId="class-modal-title"
+        isSubmitting={submitting}
+      >
+        <form onSubmit={handleSave}>
+          <div className="modal-body">
+            {formError && (
+              <div className="alert alert-danger py-2 small mb-3">
+                <i className="bi bi-exclamation-triangle me-1"></i> {formError}
               </div>
-              <form onSubmit={handleSave}>
-                <div className="modal-body">
-                  {formError && (
-                    <div className="alert alert-danger py-2 small mb-3">
-                      <i className="bi bi-exclamation-triangle me-1"></i> {formError}
-                    </div>
-                  )}
-                  <div className="mb-3">
-                    <label htmlFor="class-name" className="form-label small fw-bold">Tên lớp học</label>
-                    <input
-                      id="class-name"
-                      type="text"
-                      className="form-control"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      required
-                      placeholder="Ví dụ: Yoga Bình Minh"
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <label htmlFor="class-category" className="form-label small fw-bold">Thể loại (Category)</label>
-                    <input
-                      id="class-category"
-                      type="text"
-                      className="form-control"
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      required
-                      placeholder="Yoga, Boxing, Cardio, Pilates..."
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <label htmlFor="class-trainer-id" className="form-label small fw-bold">Chọn Huấn luyện viên phụ trách</label>
-                    <select
-                      id="class-trainer-id"
-                      className="form-select"
-                      value={formData.trainer_id}
-                      onChange={(e) => setFormData({ ...formData, trainer_id: e.target.value })}
-                      required
-                    >
-                      <option value="">-- Chọn huấn luyện viên --</option>
-                      {users
-                        .filter((u) => u.role === 'trainer' || String(u.id) === String(formData.trainer_id))
-                        .map((u) => (
-                          <option key={u.id} value={u.id}>
-                            {u.email}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                  <div className="form-check form-switch mb-2">
-                    <input
-                      className="form-check-input"
-                      type="checkbox"
-                      id="classActiveSwitch"
-                      checked={formData.is_active}
-                      onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                    />
-                    <label className="form-check-label small" htmlFor="classActiveSwitch">
-                      Đang mở lớp hoạt động
-                    </label>
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="management-secondary-button" onClick={handleCloseModal}>
-                    Hủy
-                  </button>
-                  <button type="submit" className="management-primary-button" disabled={submitting}>
-                    {submitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Thêm mới')}
-                  </button>
-                </div>
-              </form>
+            )}
+            <div className="mb-3">
+              <label htmlFor="class-name" className="form-label small fw-bold">Tên lớp học</label>
+              <input
+                id="class-name"
+                type="text"
+                className="form-control"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+                placeholder="Ví dụ: Yoga Bình Minh"
+              />
+            </div>
+            <div className="mb-3">
+              <label htmlFor="class-category" className="form-label small fw-bold">Thể loại (Category)</label>
+              <input
+                id="class-category"
+                type="text"
+                className="form-control"
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                required
+                placeholder="Yoga, Boxing, Cardio, Pilates..."
+              />
+            </div>
+            <div className="mb-3">
+              <label htmlFor="class-trainer-id" className="form-label small fw-bold">Chọn Huấn luyện viên phụ trách</label>
+              <select
+                id="class-trainer-id"
+                className="form-select"
+                value={formData.trainer_id}
+                onChange={(e) => setFormData({ ...formData, trainer_id: e.target.value })}
+                required
+              >
+                <option value="">-- Chọn huấn luyện viên --</option>
+                {users
+                  .filter((u) => u.role === 'trainer' || String(u.id) === String(formData.trainer_id))
+                  .map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.email}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div className="form-check form-switch mb-2">
+              <input
+                className="form-check-input"
+                type="checkbox"
+                id="classActiveSwitch"
+                checked={formData.is_active}
+                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+              />
+              <label className="form-check-label small" htmlFor="classActiveSwitch">
+                Đang mở lớp hoạt động
+              </label>
             </div>
           </div>
-        </div>
-      )}
+          <div className="modal-footer">
+            <button type="button" className="management-secondary-button" onClick={handleCloseModal} disabled={submitting}>
+              Hủy
+            </button>
+            <button type="submit" className="management-primary-button" disabled={submitting}>
+              {submitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Thêm mới')}
+            </button>
+          </div>
+        </form>
+      </ManagementModal>
 
       <ConfirmDialog
         isOpen={deleteConfirm.isOpen}
-        title="Xác nhận xóa Lớp học"
-        message={`Bạn có chắc muốn xóa Lớp học #${deleteConfirm.id}? Thao tác này sẽ ảnh hưởng đến các ca tập thuộc lớp này.`}
+        title="Xóa lớp học"
+        message={`Lớp học #${deleteConfirm.id} và toàn bộ thông tin môn học sẽ bị xóa vĩnh viễn. Các ca tập thuộc lớp này có thể bị ảnh hưởng.`}
         confirmText="Xóa lớp học"
-        cancelText="Hủy bỏ"
+        cancelText="Giữ lại"
         variant="danger"
         loading={deleteConfirm.loading}
         onConfirm={handleConfirmDelete}

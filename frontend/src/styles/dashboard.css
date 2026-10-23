@@ -1,33 +1,26 @@
 .dashboard-header {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 24px;
+  gap: 20px;
+  margin-bottom: 16px;
 }
 
 .dashboard-header h1 {
   margin: 0;
   color: var(--text-primary);
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 750;
   letter-spacing: -0.025em;
   line-height: 1.2;
-}
-
-.dashboard-header p {
-  margin: 6px 0 0;
-  color: var(--text-secondary);
-  font-size: 14px;
-  line-height: 1.45;
 }
 
 .refresh-button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 38px;
-  padding: 8px 16px;
+  min-height: 36px;
+  padding: 6px 14px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
@@ -54,53 +47,18 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 22px;
-  padding: 12px 16px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
   border: 1px solid var(--color-warning-border);
   border-radius: var(--radius-sm);
   color: var(--color-warning);
   background: var(--color-warning-bg);
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 500;
 }
 
 .dashboard-alert i {
-  font-size: 18px;
-}
-
-.quick-actions-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 24px;
-  padding: 10px 16px;
-  background: var(--surface);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  overflow-x: auto;
-}
-
-.quick-action-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 14px;
-  background: var(--color-primary-subtle);
-  border: 1px solid var(--color-primary-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-primary);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s ease;
-}
-
-.quick-action-btn:hover {
-  background: var(--color-primary);
-  color: #fff;
-  border-color: var(--color-primary);
+  font-size: 16px;
 }
 
 .kpi-grid {
@@ -147,7 +105,7 @@
   border-radius: var(--radius-sm);
   color: var(--color-primary);
   background: var(--color-primary-subtle);
-  font-size: 17px;
+  font-size: 16px;
 }
 
 .kpi-card-value {
@@ -163,7 +121,7 @@
 .kpi-card-label {
   margin-top: 6px;
   color: var(--text-secondary);
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
 }
 
@@ -206,7 +164,7 @@
   align-items: center;
   gap: 9px;
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 750;
   color: var(--text-primary);
 }
@@ -217,7 +175,7 @@
 }
 
 .dashboard-panel-action {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-primary);
   background: transparent;
@@ -240,7 +198,7 @@
 .dashboard-table-compact {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .dashboard-table-compact td {
@@ -261,7 +219,7 @@
   padding: 36px 20px;
   text-align: center;
   color: var(--text-muted);
-  font-size: 13.5px;
+  font-size: 14px;
 }
 
 .spin {
@@ -280,10 +238,12 @@
 
 @media (max-width: 1100px) {
   .kpi-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
   }
   .dashboard-split-grid {
     grid-template-columns: 1fr;
+    gap: 16px;
   }
 }
 
@@ -291,11 +251,11 @@
   .dashboard-header {
     align-items: flex-start;
     flex-direction: column;
-    gap: 16px;
-    margin-bottom: 20px;
+    gap: 12px;
+    margin-bottom: 16px;
   }
   .dashboard-header h1 {
-    font-size: 24px;
+    font-size: 26px;
   }
   .refresh-button {
     align-self: stretch;
@@ -303,16 +263,19 @@
   }
   .kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+    gap: 10px;
   }
   .kpi-card {
-    min-height: 110px;
-    padding: 14px 16px;
+    min-height: 104px;
+    padding: 12px 14px;
   }
   .kpi-card-value {
-    font-size: 24px;
+    font-size: 26px;
   }
-  .quick-actions-bar {
-    padding: 10px 14px;
+}
+
+@media (max-width: 440px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
   }
 }

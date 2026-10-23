@@ -12,6 +12,9 @@ export default function AttendanceCalendar({ checkInRecords = [] }) {
   const currentYear = viewDate.getFullYear()
   const currentMonth = viewDate.getMonth() // 0-indexed
 
+  // Check if viewing the real-world current month
+  const isCurrentMonth = currentYear === todayYear && currentMonth === todayMonth
+
   // Format month title
   const monthTitle = `Tháng ${String(currentMonth + 1).padStart(2, '0')} / ${currentYear}`
 
@@ -123,24 +126,25 @@ export default function AttendanceCalendar({ checkInRecords = [] }) {
             type="button"
             className="calendar-nav-btn"
             onClick={handlePrevMonth}
-            aria-label="Tháng trước"
+            aria-label="Xem tháng trước"
           >
-            <i className="bi bi-chevron-left me-1"></i> Trước
+            <i className="bi bi-chevron-left me-1"></i> Tháng trước
           </button>
           <button
             type="button"
-            className="calendar-nav-btn is-today"
+            className={`calendar-nav-btn ${isCurrentMonth ? 'is-today' : ''}`.trim()}
             onClick={handleToday}
+            aria-label="Về tháng hiện tại"
           >
-            Hôm nay
+            Tháng này
           </button>
           <button
             type="button"
             className="calendar-nav-btn"
             onClick={handleNextMonth}
-            aria-label="Tháng sau"
+            aria-label="Xem tháng sau"
           >
-            Sau <i className="bi bi-chevron-right ms-1"></i>
+            Tháng sau <i className="bi bi-chevron-right ms-1"></i>
           </button>
         </div>
       </div>

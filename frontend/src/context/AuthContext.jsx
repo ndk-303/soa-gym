@@ -41,7 +41,8 @@ export function AuthProvider({ children }) {
 
   const isAuthenticated = Boolean(token && user)
   const isAdmin = user?.role === 'admin'
-  const isMember = user?.role === 'member' || user?.role === 'user'
+  const isTrainer = user?.role === 'trainer'
+  const isMember = user?.role === 'member' || user?.role === 'user' || (!isAdmin && !isTrainer)
 
   return (
     <AuthContext.Provider
@@ -51,6 +52,7 @@ export function AuthProvider({ children }) {
         loading,
         isAuthenticated,
         isAdmin,
+        isTrainer,
         isMember,
         login,
         logout,

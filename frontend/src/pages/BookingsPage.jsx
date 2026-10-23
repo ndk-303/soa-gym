@@ -2,11 +2,13 @@ import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { bookingsApi, membersApi, slotsApi, classesApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
-import { ActionMenu, ManagementHeader, ManagementTable, ManagementFilterBar } from '../components/ManagementUI'
+import { ActionMenu, ManagementHeader, ManagementTable, ManagementFilterBar, ManagementModal } from '../components/ManagementUI'
 import { formatSchedule } from '../components/managementUtils'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { useToast } from '../context/ToastContext'
 
 export default function BookingsPage() {
+  const toast = useToast()
   const { isAdmin } = useAuth()
   const [bookings, setBookings] = useState([])
 
@@ -91,6 +93,18 @@ export default function BookingsPage() {
     e.preventDefault()
     setSubmitting(true)
     setFormError(null)
+
+    if (!formData.member_id) {
+      setFormError('Vui lòng chọn hội viên cần đặt chỗ')
+      setSubmitting(false)
+      return
+    }
+    if (!formData.slot_id) {
+      setFormError('Vui lòng chọn ca tập cần đặt chỗ')
+      setSubmitting(false)
+      return
+    }
+
     try {
       const payload = {
         member_id: Number(formData.member_id),
@@ -100,8 +114,10 @@ export default function BookingsPage() {
       }
       if (editingId) {
         await bookingsApi.update(editingId, payload)
+        toast.success('Cập nhật đặt chỗ thành công')
       } else {
         await bookingsApi.create(payload)
+        toast.success('Thêm mới đặt chỗ thành công')
       }
       handleCloseModal()
       fetchData()
@@ -122,10 +138,13 @@ export default function BookingsPage() {
     try {
       await bookingsApi.delete(deleteConfirm.id)
       setDeleteConfirm({ isOpen: false, id: null, loading: false })
+      toast.success('Đã hủy đặt chỗ thành công')
       fetchData()
     } catch (err) {
       setDeleteConfirm({ isOpen: false, id: null, loading: false })
-      setError('Lỗi xóa: ' + (err.response?.data?.detail || err.message))
+      const errorMsg = 'Lỗi xóa: ' + (err.response?.data?.detail || err.message)
+      setError(errorMsg)
+      toast.error(errorMsg)
     }
   }
 
@@ -135,10 +154,10 @@ export default function BookingsPage() {
 
   const statusOptions = [
     { value: 'all', label: 'Tất cả trạng thái' },
-    { value: 'confirmed', label: 'confirmed (Đã xác nhận)' },
-    { value: 'waitlisted', label: 'waitlisted (Danh sách chờ)' },
-    { value: 'attended', label: 'attended (Đã tham gia)' },
-    { value: 'cancelled', label: 'cancelled (Đã hủy)' },
+    { value: 'confirmed', label: 'Đã xác nhận' },
+    { value: 'waitlist', label: 'Danh sách chờ' },
+    { value: 'attended', label: 'Đã tham gia' },
+    { value: 'cancelled', label: 'Đã hủy' },
   ]
 
   const filteredBookings = useMemo(() => {
@@ -167,11 +186,9 @@ export default function BookingsPage() {
     <div>
       <ManagementHeader
         title="Đặt chỗ"
-        description="Theo dõi đăng ký lớp học và danh sách chờ của hội viên"
         onRefresh={fetchData}
         onAdd={handleOpenAdd}
         addLabel="Đặt chỗ mới"
-        count={bookings.length}
       />
 
       {error && (
@@ -194,12 +211,13 @@ export default function BookingsPage() {
       />
 
       <ManagementTable
+        minWidth={isAdmin ? 720 : 600}
         columns={[
-          { key: 'member', label: 'Hội viên', width: isAdmin ? '28%' : '35%' },
-          { key: 'class', label: 'Lớp học / Ca tập', width: isAdmin ? '18%' : '25%' },
-          { key: 'waitlist', label: 'Vị trí chờ', width: isAdmin ? '19%' : '25%' },
-          { key: 'status', label: 'Trạng thái', width: isAdmin ? '15%' : '15%' },
-          ...(isAdmin ? [{ key: 'actions', label: 'Hành động', width: '190px', align: 'center' }] : []),
+          { key: 'member', label: 'Hội viên', width: isAdmin ? '26%' : '32%' },
+          { key: 'class', label: 'Lớp học / Ca tập', width: isAdmin ? '28%' : '34%' },
+          { key: 'waitlist', label: 'Vị trí chờ', width: isAdmin ? '16%' : '18%', align: 'center' },
+          { key: 'status', label: 'Trạng thái', width: isAdmin ? '15%' : '16%' },
+          ...(isAdmin ? [{ key: 'actions', label: 'Hành động', width: '15%', align: 'center' }] : []),
         ]}
         loading={loading}
         loadingMessage="Đang tải dữ liệu Đặt chỗ..."
@@ -232,13 +250,13 @@ export default function BookingsPage() {
                 <div className="primary-cell">{gymClass ? gymClass.name : `Ca #${b.slot_id}`}</div>
                 <div className="secondary-cell">{slot ? (() => { const schedule = formatSchedule(slot.start_time); return `${schedule.date} · ${schedule.time}` })() : 'Chưa có lịch'}</div>
               </td>
-              <td>{b.waitlist_position ? <span className="waitlist-value">#{b.waitlist_position}</span> : <span className="table-note">—</span>}</td>
+              <td className="text-center">{b.waitlist_position ? <span className="waitlist-value">#{b.waitlist_position}</span> : <span className="table-note">—</span>}</td>
               <td>
                 <StatusBadge status={b.status} />
               </td>
               {isAdmin && (
-                <td className="text-end">
-                  <ActionMenu onEdit={() => handleOpenEdit(b)} onDelete={() => handleOpenDelete(b.id)} deleteLabel="Xóa đặt chỗ" />
+                <td className="text-center actions-cell">
+                  <ActionMenu onEdit={() => handleOpenEdit(b)} onDelete={() => handleOpenDelete(b.id)} />
                 </td>
               )}
             </tr>
@@ -247,116 +265,103 @@ export default function BookingsPage() {
       </ManagementTable>
 
 
-      {showModal && (
-        <div
-          className="modal show d-block"
-          tabIndex="-1"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="booking-modal-title"
-          style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}
-        >
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content border-0 shadow">
-              <div className="modal-header">
-                <h5 id="booking-modal-title" className="modal-title fw-bold">
-                  {editingId ? `Cập nhật Đặt chỗ #${editingId}` : 'Thêm mới Đặt chỗ'}
-                </h5>
-                <button type="button" className="btn-close" onClick={handleCloseModal} aria-label="Đóng"></button>
+      <ManagementModal
+        isOpen={showModal}
+        onClose={handleCloseModal}
+        title={editingId ? `Cập nhật Đặt chỗ #${editingId}` : 'Thêm mới Đặt chỗ'}
+        titleId="booking-modal-title"
+        isSubmitting={submitting}
+      >
+        <form onSubmit={handleSave}>
+          <div className="modal-body">
+            {formError && (
+              <div className="alert alert-danger py-2 small mb-3">
+                <i className="bi bi-exclamation-triangle me-1"></i> {formError}
               </div>
-              <form onSubmit={handleSave}>
-                <div className="modal-body">
-                  {formError && (
-                    <div className="alert alert-danger py-2 small mb-3">
-                      <i className="bi bi-exclamation-triangle me-1"></i> {formError}
-                    </div>
-                  )}
-                  <div className="mb-3">
-                    <label htmlFor="booking-member-id" className="form-label small fw-bold">Chọn Hội viên</label>
-                    <select
-                      id="booking-member-id"
-                      className="form-select"
-                      value={formData.member_id}
-                      onChange={(e) => setFormData({ ...formData, member_id: e.target.value })}
-                      required
-                    >
-                      <option value="">-- Chọn hội viên --</option>
-                      {members.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.full_name} ({m.email})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+            )}
+            <div className="mb-3">
+              <label htmlFor="booking-member-id" className="form-label small fw-bold">Chọn Hội viên</label>
+              <select
+                id="booking-member-id"
+                className="form-select"
+                value={formData.member_id}
+                onChange={(e) => setFormData({ ...formData, member_id: e.target.value })}
+                required
+              >
+                <option value="">-- Chọn hội viên --</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.full_name} ({m.email})
+                  </option>
+                ))}
+              </select>
+            </div>
 
-                  <div className="mb-3">
-                    <label htmlFor="booking-slot-id" className="form-label small fw-bold">Chọn Ca tập</label>
-                    <select
-                      id="booking-slot-id"
-                      className="form-select"
-                      value={formData.slot_id}
-                      onChange={(e) => setFormData({ ...formData, slot_id: e.target.value })}
-                      required
-                    >
-                      <option value="">-- Chọn ca tập --</option>
-                      {slots.map((s) => {
-                        const linkedClass = classMap[s.class_id]
-                        return (
-                          <option key={s.id} value={s.id}>
-                            {s.start_time} - {linkedClass ? linkedClass.name : `Lớp #${s.class_id}`} (Đã đặt {s.current_bookings}/{s.max_capacity})
-                          </option>
-                        )
-                      })}
-                    </select>
-                  </div>
+            <div className="mb-3">
+              <label htmlFor="booking-slot-id" className="form-label small fw-bold">Chọn Ca tập</label>
+              <select
+                id="booking-slot-id"
+                className="form-select"
+                value={formData.slot_id}
+                onChange={(e) => setFormData({ ...formData, slot_id: e.target.value })}
+                required
+              >
+                <option value="">-- Chọn ca tập --</option>
+                {slots.map((s) => {
+                  const linkedClass = classMap[s.class_id]
+                  return (
+                    <option key={s.id} value={s.id}>
+                      {s.start_time} - {linkedClass ? linkedClass.name : `Lớp #${s.class_id}`} (Đã đặt {s.current_bookings}/{s.max_capacity})
+                    </option>
+                  )
+                })}
+              </select>
+            </div>
 
-                  <div className="mb-3">
-                    <label htmlFor="booking-status" className="form-label small fw-bold">Trạng thái đặt chỗ</label>
-                    <select
-                      id="booking-status"
-                      className="form-select"
-                      value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    >
-                      <option value="confirmed">confirmed (Đã xác nhận)</option>
-                      <option value="waitlist">waitlist (Hàng chờ)</option>
-                      <option value="cancelled">cancelled (Đã hủy)</option>
-                    </select>
-                  </div>
+            <div className="mb-3">
+              <label htmlFor="booking-status" className="form-label small fw-bold">Trạng thái đặt chỗ</label>
+              <select
+                id="booking-status"
+                className="form-select"
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              >
+                <option value="confirmed">Đã xác nhận</option>
+                <option value="waitlist">Danh sách chờ (Waitlist)</option>
+                <option value="cancelled">Đã hủy</option>
+              </select>
+            </div>
 
-                  <div className="mb-2">
-                    <label htmlFor="booking-waitlist" className="form-label small fw-bold">Vị trí hàng chờ (nếu vào waitlist)</label>
-                    <input
-                      id="booking-waitlist"
-                      type="number"
-                      min="1"
-                      placeholder="Để trống nếu đã xác nhận"
-                      className="form-control"
-                      value={formData.waitlist_position}
-                      onChange={(e) => setFormData({ ...formData, waitlist_position: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="management-secondary-button" onClick={handleCloseModal}>
-                    Hủy
-                  </button>
-                  <button type="submit" className="management-primary-button" disabled={submitting}>
-                    {submitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Thêm mới')}
-                  </button>
-                </div>
-              </form>
+            <div className="mb-2">
+              <label htmlFor="booking-waitlist" className="form-label small fw-bold">Vị trí hàng chờ (nếu vào waitlist)</label>
+              <input
+                id="booking-waitlist"
+                type="number"
+                min="1"
+                placeholder="Để trống nếu đã xác nhận"
+                className="form-control"
+                value={formData.waitlist_position}
+                onChange={(e) => setFormData({ ...formData, waitlist_position: e.target.value })}
+              />
             </div>
           </div>
-        </div>
-      )}
+          <div className="modal-footer">
+            <button type="button" className="management-secondary-button" onClick={handleCloseModal} disabled={submitting}>
+              Hủy
+            </button>
+            <button type="submit" className="management-primary-button" disabled={submitting}>
+              {submitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Thêm mới')}
+            </button>
+          </div>
+        </form>
+      </ManagementModal>
 
       <ConfirmDialog
         isOpen={deleteConfirm.isOpen}
-        title="Xác nhận hủy đặt chỗ"
-        message={`Bạn có chắc muốn hủy bản ghi Đặt chỗ #${deleteConfirm.id}? Thao tác này không thể hoàn tác.`}
+        title="Hủy lượt đặt chỗ"
+        message={`Bản ghi đặt chỗ #${deleteConfirm.id} sẽ bị hủy bỏ và suất tập này sẽ được nhường lại cho hội viên trong danh sách chờ.`}
         confirmText="Hủy đặt chỗ"
-        cancelText="Quay lại"
+        cancelText="Giữ lại"
         variant="danger"
         loading={deleteConfirm.loading}
         onConfirm={handleConfirmDelete}

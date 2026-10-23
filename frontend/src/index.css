@@ -59,6 +59,17 @@ body {
   color: #1e3a8a;
 }
 
+/* Themed focus rings */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Caret theming */
+input, textarea {
+  caret-color: var(--color-primary);
+}
+
 ::-webkit-scrollbar {
   width: 7px;
   height: 7px;
@@ -79,12 +90,25 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {
-    animation-duration: 0.001s !important;
+    animation-duration: 0.15s !important;
     animation-iteration-count: 1 !important;
+    transition-duration: 0.15s !important;
     scroll-behavior: auto !important;
+    transform: none !important;
   }
 
-  * {
-    transition: opacity 0.15s ease, background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease !important;
+  .toast-item {
+    animation: fadeIn 0.15s ease-out !important;
+  }
+
+  .modal.show,
+  .confirm-dialog-backdrop {
+    transition: opacity 0.15s ease !important;
   }
 }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+

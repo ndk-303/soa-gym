@@ -1,11 +1,13 @@
 import { useState, useEffect, useMemo } from 'react'
 import { membersApi, usersApi, plansApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
-import { ActionMenu, ManagementHeader, ManagementTable, ManagementFilterBar } from '../components/ManagementUI'
+import { ActionMenu, ManagementHeader, ManagementTable, ManagementFilterBar, ManagementModal } from '../components/ManagementUI'
 import { formatVnd } from '../components/managementUtils'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { useToast } from '../context/ToastContext'
 
 export default function MembersPage() {
+  const toast = useToast()
   const [members, setMembers] = useState([])
   const [users, setUsers] = useState([])
   const [plans, setPlans] = useState([])
@@ -101,18 +103,40 @@ export default function MembersPage() {
     e.preventDefault()
     setSubmitting(true)
     setFormError(null)
+
+    const cleanName = formData.full_name?.trim() || ''
+    const cleanEmail = formData.email?.trim() || ''
+
+    if (!formData.user_id) {
+      setFormError('Vui lòng chọn tài khoản người dùng liên kết với hội viên')
+      setSubmitting(false)
+      return
+    }
+    if (!cleanName) {
+      setFormError('Vui lòng nhập họ và tên của hội viên')
+      setSubmitting(false)
+      return
+    }
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      setFormError('Vui lòng nhập địa chỉ email hợp lệ (ví dụ: hoivien@gym.com)')
+      setSubmitting(false)
+      return
+    }
+
     try {
       const payload = {
         user_id: Number(formData.user_id),
-        full_name: formData.full_name,
-        email: formData.email,
+        full_name: cleanName,
+        email: cleanEmail,
         status: formData.status,
         membership_plan_id: formData.membership_plan_id ? Number(formData.membership_plan_id) : null,
       }
       if (editingId) {
         await membersApi.update(editingId, payload)
+        toast.success('Cập nhật thông tin hội viên thành công')
       } else {
         await membersApi.create(payload)
+        toast.success('Thêm mới hội viên thành công')
       }
       handleCloseModal()
       fetchData()
@@ -133,10 +157,13 @@ export default function MembersPage() {
     try {
       await membersApi.delete(deleteConfirm.id)
       setDeleteConfirm({ isOpen: false, id: null, loading: false })
+      toast.success('Đã xóa hội viên thành công')
       fetchData()
     } catch (err) {
       setDeleteConfirm({ isOpen: false, id: null, loading: false })
-      setError('Lỗi xóa: ' + (err.response?.data?.detail || err.message))
+      const errorMsg = 'Lỗi xóa: ' + (err.response?.data?.detail || err.message)
+      setError(errorMsg)
+      toast.error(errorMsg)
     }
   }
 
@@ -145,10 +172,10 @@ export default function MembersPage() {
 
   const statusOptions = [
     { value: 'all', label: 'Tất cả trạng thái' },
-    { value: 'active', label: 'active (Hoạt động)' },
-    { value: 'pending', label: 'pending (Chờ kích hoạt)' },
-    { value: 'expired', label: 'expired (Hết hạn)' },
-    { value: 'cancelled', label: 'cancelled (Đã hủy)' },
+    { value: 'active', label: 'Đang hoạt động' },
+    { value: 'pending', label: 'Chờ kích hoạt' },
+    { value: 'expired', label: 'Hết hạn' },
+    { value: 'cancelled', label: 'Đã hủy' },
   ]
 
   const filteredMembers = useMemo(() => {
@@ -174,11 +201,9 @@ export default function MembersPage() {
     <div>
       <ManagementHeader
         title="Hội viên"
-        description="Hồ sơ hội viên, gói tập hiện tại và trạng thái kích hoạt"
         onRefresh={fetchData}
         onAdd={handleOpenAdd}
         addLabel="Thêm hội viên"
-        count={members.length}
       />
 
       {error && (
@@ -201,12 +226,13 @@ export default function MembersPage() {
       />
 
       <ManagementTable
+        minWidth={700}
         columns={[
           { key: 'member', label: 'Hội viên', width: '28%' },
-          { key: 'user', label: 'Tài khoản User', width: '18%' },
-          { key: 'plan', label: 'Gói tập hiện tại', width: '19%' },
-          { key: 'status', label: 'Trạng thái', width: '15%' },
-          { key: 'actions', label: 'Hành động', width: '190px', align: 'center' },
+          { key: 'user', label: 'Tài khoản User', width: '24%' },
+          { key: 'plan', label: 'Gói tập hiện tại', width: '20%' },
+          { key: 'status', label: 'Trạng thái', width: '14%' },
+          { key: 'actions', label: 'Hành động', width: '14%', align: 'center' },
         ]}
         loading={loading}
         loadingMessage="Đang tải dữ liệu Hội viên..."
@@ -226,157 +252,144 @@ export default function MembersPage() {
         }
       >
         {filteredMembers.map((m) => {
-                  const linkedUser = m.user || userMap[m.user_id]
-                  const linkedPlan = m.membership_plan || planMap[m.membership_plan_id]
-                  return (
-                    <tr key={m.id}>
-                      <td className="identity-cell">
-                        <div className="identity-name">{m.full_name}</div>
-                        <div className="identity-email">{m.email || 'Chưa có email'}</div>
-                      </td>
-                      <td>
-                        <span className="linked-value"><i className="bi bi-person"></i>{linkedUser ? linkedUser.email : `Tài khoản #${m.user_id}`}</span>
-                      </td>
-                      <td>
-                        {linkedPlan ? (
-                          <span className="primary-cell">{linkedPlan.name}</span>
-                        ) : (
-                          <span className="table-note">Chưa đăng ký</span>
-                        )}
-                      </td>
-                      <td>
-                        <StatusBadge status={m.status} />
-                      </td>
-                      <td className="text-end">
-                        <ActionMenu onEdit={() => handleOpenEdit(m)} onDelete={() => handleOpenDelete(m.id)} />
-                      </td>
-                    </tr>
-                  )
-                })}
+          const linkedUser = m.user || userMap[m.user_id]
+          const linkedPlan = m.membership_plan || planMap[m.membership_plan_id]
+          return (
+            <tr key={m.id}>
+              <td className="identity-cell">
+                <div className="identity-name">{m.full_name}</div>
+                <div className="identity-email">{m.email || 'Chưa có email'}</div>
+              </td>
+              <td>
+                <span className="linked-value"><i className="bi bi-person"></i>{linkedUser ? linkedUser.email : `Tài khoản #${m.user_id}`}</span>
+              </td>
+              <td>
+                {linkedPlan ? (
+                  <span className="primary-cell">{linkedPlan.name}</span>
+                ) : (
+                  <span className="table-note">Chưa đăng ký</span>
+                )}
+              </td>
+              <td>
+                <StatusBadge status={m.status} />
+              </td>
+              <td className="text-center actions-cell">
+                <ActionMenu onEdit={() => handleOpenEdit(m)} onDelete={() => handleOpenDelete(m.id)} />
+              </td>
+            </tr>
+          )
+        })}
       </ManagementTable>
 
-      {showModal && (
-        <div
-          className="modal show d-block"
-          tabIndex="-1"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="member-modal-title"
-          style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}
-        >
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content border-0 shadow">
-              <div className="modal-header">
-                <h5 id="member-modal-title" className="modal-title fw-bold">
-                  {editingId ? `Cập nhật Hội viên #${editingId}` : 'Thêm mới Hội viên'}
-                </h5>
-                <button type="button" className="btn-close" onClick={handleCloseModal} aria-label="Đóng"></button>
+      <ManagementModal
+        isOpen={showModal}
+        onClose={handleCloseModal}
+        title={editingId ? `Cập nhật Hội viên #${editingId}` : 'Thêm mới Hội viên'}
+        titleId="member-modal-title"
+        isSubmitting={submitting}
+      >
+        <form onSubmit={handleSave}>
+          <div className="modal-body">
+            {formError && (
+              <div className="alert alert-danger py-2 small mb-3">
+                <i className="bi bi-exclamation-triangle me-1"></i> {formError}
               </div>
-              <form onSubmit={handleSave}>
-                <div className="modal-body">
-                  {formError && (
-                    <div className="alert alert-danger py-2 small mb-3">
-                      <i className="bi bi-exclamation-triangle me-1"></i> {formError}
-                    </div>
-                  )}
+            )}
 
-                  <div className="mb-3">
-                    <label htmlFor="member-user-id" className="form-label small fw-bold">Chọn Tài khoản User liên kết</label>
-                    <select
-                      id="member-user-id"
-                      className="form-select"
-                      value={formData.user_id}
-                      onChange={(e) => handleUserSelect(e.target.value)}
-                      required
-                    >
-                      <option value="">-- Chọn tài khoản User --</option>
-                      {users.map((u) => {
-                        const isAssigned = members.some((m) => m.user_id === u.id && m.id !== editingId)
-                        return (
-                          <option key={u.id} value={u.id} disabled={isAssigned}>
-                            {u.email} ({u.role}) {isAssigned ? '- [Đã có hồ sơ]' : ''}
-                          </option>
-                        )
-                      })}
-                    </select>
-                  </div>
+            <div className="mb-3">
+              <label htmlFor="member-user-id" className="form-label small fw-bold">Chọn Tài khoản User liên kết</label>
+              <select
+                id="member-user-id"
+                className="form-select"
+                value={formData.user_id}
+                onChange={(e) => handleUserSelect(e.target.value)}
+                required
+              >
+                <option value="">-- Chọn tài khoản User --</option>
+                {users.map((u) => {
+                  const isAssigned = members.some((m) => m.user_id === u.id && m.id !== editingId)
+                  return (
+                    <option key={u.id} value={u.id} disabled={isAssigned}>
+                      {u.email} ({u.role}) {isAssigned ? '- [Đã có hồ sơ]' : ''}
+                    </option>
+                  )
+                })}
+              </select>
+            </div>
 
-                  <div className="mb-3">
-                    <label htmlFor="member-full-name" className="form-label small fw-bold">Họ và Tên Hội viên</label>
-                    <input
-                      id="member-full-name"
-                      type="text"
-                      className="form-control"
-                      value={formData.full_name}
-                      onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                      required
-                      placeholder="Ví dụ: Nguyễn Văn An"
-                    />
-                  </div>
+            <div className="mb-3">
+              <label htmlFor="member-full-name" className="form-label small fw-bold">Họ và Tên Hội viên</label>
+              <input
+                id="member-full-name"
+                type="text"
+                className="form-control"
+                value={formData.full_name}
+                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                required
+                placeholder="Ví dụ: Nguyễn Văn An"
+              />
+            </div>
 
-                  <div className="mb-3">
-                    <label htmlFor="member-email" className="form-label small fw-bold">Email liên lạc</label>
-                    <input
-                      id="member-email"
-                      type="email"
-                      className="form-control"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      required
-                    />
-                  </div>
+            <div className="mb-3">
+              <label htmlFor="member-email" className="form-label small fw-bold">Email liên lạc</label>
+              <input
+                id="member-email"
+                type="email"
+                className="form-control"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
+              />
+            </div>
 
-                  <div className="mb-3">
-                    <label htmlFor="member-plan-id" className="form-label small fw-bold">Chọn Gói tập</label>
-                    <select
-                      id="member-plan-id"
-                      className="form-select"
-                      value={formData.membership_plan_id}
-                      onChange={(e) => setFormData({ ...formData, membership_plan_id: e.target.value })}
-                    >
-                      <option value="">-- Chưa đăng ký gói tập --</option>
-                      {plans.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} - {formatVnd(p.price)} ({p.duration_days} ngày)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+            <div className="mb-3">
+              <label htmlFor="member-plan-id" className="form-label small fw-bold">Chọn Gói tập</label>
+              <select
+                id="member-plan-id"
+                className="form-select"
+                value={formData.membership_plan_id}
+                onChange={(e) => setFormData({ ...formData, membership_plan_id: e.target.value })}
+              >
+                <option value="">-- Chưa đăng ký gói tập --</option>
+                {plans.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} - {formatVnd(p.price)} ({p.duration_days} ngày)
+                  </option>
+                ))}
+              </select>
+            </div>
 
-                  <div className="mb-2">
-                    <label htmlFor="member-status" className="form-label small fw-bold">Trạng thái Hội viên</label>
-                    <select
-                      id="member-status"
-                      className="form-select"
-                      value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    >
-                      <option value="active">active (Đang hoạt động)</option>
-                      <option value="inactive">inactive (Tạm ngưng)</option>
-                      <option value="expired">expired (Hết hạn)</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="management-secondary-button" onClick={handleCloseModal}>
-                    Hủy
-                  </button>
-                  <button type="submit" className="management-primary-button" disabled={submitting}>
-                    {submitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Thêm mới')}
-                  </button>
-                </div>
-              </form>
+            <div className="mb-2">
+              <label htmlFor="member-status" className="form-label small fw-bold">Trạng thái Hội viên</label>
+              <select
+                id="member-status"
+                className="form-select"
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              >
+                <option value="active">Đang hoạt động</option>
+                <option value="inactive">Tạm ngưng</option>
+                <option value="expired">Hết hạn</option>
+              </select>
             </div>
           </div>
-        </div>
-      )}
+          <div className="modal-footer">
+            <button type="button" className="management-secondary-button" onClick={handleCloseModal} disabled={submitting}>
+              Hủy
+            </button>
+            <button type="submit" className="management-primary-button" disabled={submitting}>
+              {submitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Thêm mới')}
+            </button>
+          </div>
+        </form>
+      </ManagementModal>
 
       <ConfirmDialog
         isOpen={deleteConfirm.isOpen}
-        title="Xác nhận xóa Hội viên"
-        message={`Bạn có chắc muốn xóa Hội viên #${deleteConfirm.id}? Thao tác này sẽ xóa hồ sơ và thông tin liên quan.`}
+        title="Xóa hồ sơ hội viên"
+        message={`Hội viên #${deleteConfirm.id} và toàn bộ thông tin đăng ký gói tập, lịch sử check-in sẽ bị xóa vĩnh viễn khỏi hệ thống. Hành động này không thể hoàn tác.`}
         confirmText="Xóa hội viên"
-        cancelText="Hủy bỏ"
+        cancelText="Giữ lại"
         variant="danger"
         loading={deleteConfirm.loading}
         onConfirm={handleConfirmDelete}

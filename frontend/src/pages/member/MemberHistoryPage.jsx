@@ -96,8 +96,8 @@ export default function MemberHistoryPage({ currentMember }) {
                 <tr>
                   <th style={{ width: '15%' }}>Mã hóa đơn</th>
                   <th style={{ width: '30%' }}>Khoản mục</th>
-                  <th style={{ width: '18%' }} className="text-end">Số tiền</th>
-                  <th style={{ width: '18%' }} className="text-end">Đã thanh toán</th>
+                  <th style={{ width: '18%' }}>Số tiền</th>
+                  <th style={{ width: '18%' }}>Đã thanh toán</th>
                   <th style={{ width: '19%' }}>Trạng thái</th>
                 </tr>
               </thead>
@@ -113,10 +113,10 @@ export default function MemberHistoryPage({ currentMember }) {
                         {inv.created_at ? formatDateTime(inv.created_at) : 'Ghi nhận từ hệ thống'}
                       </div>
                     </td>
-                    <td className="text-end">
+                    <td>
                       <span className="money">{formatVnd(inv.amount)}</span>
                     </td>
-                    <td className="text-end">
+                    <td>
                       <span className="money is-success">{formatVnd(inv.amount_paid || (inv.status === 'paid' ? inv.amount : 0))}</span>
                     </td>
                     <td>

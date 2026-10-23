@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react'
 import { plansApi, membersApi, invoicesApi } from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { formatVnd } from '../../components/managementUtils'
+import { ManagementModal } from '../../components/ManagementUI'
+import { useToast } from '../../context/ToastContext'
 
 export default function MemberPlansPage({ currentMember, onMemberRefresh, onTabChange }) {
+  const toast = useToast()
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -66,14 +69,17 @@ export default function MemberPlansPage({ currentMember, onMemberRefresh, onTabC
       })
 
       setRegisterSuccess(`Chúc mừng bạn đã đăng ký thành công ${selectedPlan.name}! Gói tập đã được kích hoạt.`)
+      toast.success(`Đã đăng ký ${selectedPlan.name} thành công!`)
       onMemberRefresh?.()
 
       setTimeout(() => {
         handleCloseModal()
         onTabChange?.('dashboard')
-      }, 1400)
+      }, 1200)
     } catch (err) {
-      setRegisterError(err.response?.data?.detail || err.message || 'Lỗi đăng ký gói tập')
+      const errorMsg = err.response?.data?.detail || err.message || 'Lỗi đăng ký gói tập'
+      setRegisterError(errorMsg)
+      toast.error(errorMsg)
     } finally {
       setRegistering(false)
     }
@@ -180,75 +186,65 @@ export default function MemberPlansPage({ currentMember, onMemberRefresh, onTabC
         </div>
       )}
 
-      {/* Confirmation Modal with Design System tokens */}
-      {selectedPlan && (
-        <div
-          className="modal show d-block"
-          tabIndex="-1"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="plan-confirm-modal-title"
-          style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}
-        >
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content border-0">
-              <div className="modal-header">
-                <h3 className="modal-title" id="plan-confirm-modal-title">Xác nhận Đăng ký Gói tập</h3>
-                <button type="button" className="btn-close" onClick={handleCloseModal} aria-label="Đóng"></button>
-              </div>
-              <div className="modal-body">
-                {registerSuccess ? (
-                  <div className="management-error" style={{ background: 'var(--color-success-bg)', borderColor: 'var(--color-success-border)', color: 'var(--color-success)' }}>
-                    <i className="bi bi-check-circle-fill fs-5"></i>
-                    <div>{registerSuccess}</div>
-                  </div>
-                ) : (
-                  <>
-                    {registerError && (
-                      <div className="management-error">
-                        <i className="bi bi-exclamation-triangle"></i>
-                        <div>{registerError}</div>
-                      </div>
-                    )}
-                    <p style={{ color: 'var(--text-secondary)', marginBottom: '14px', fontSize: '13.5px' }}>
-                      Bạn có chắc muốn đăng ký gói tập sau đây?
-                    </p>
-                    <div style={{ padding: '16px', background: 'var(--page-background)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', marginBottom: '14px' }}>
-                      <div style={{ fontWeight: 750, color: 'var(--text-primary)', fontSize: '16px' }}>
-                        {selectedPlan.name}
-                      </div>
-                      <div style={{ color: 'var(--color-primary)', fontWeight: 750, fontSize: '22px', marginTop: '4px', fontVariantNumeric: 'tabular-nums' }}>
-                        {formatVnd(selectedPlan.price)}
-                      </div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '12.5px', marginTop: '4px' }}>
-                        <i className="bi bi-clock me-1"></i> Thời hạn sử dụng: {selectedPlan.duration_days} ngày
-                      </div>
-                    </div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
-                      * Chế độ kiểm thử: Gói tập sẽ được tự động kích hoạt ngay lập tức và sinh hóa đơn đã thanh toán.
-                    </div>
-                  </>
-                )}
-              </div>
-              {!registerSuccess && (
-                <div className="modal-footer">
-                  <button type="button" className="management-secondary-button" onClick={handleCloseModal} disabled={registering}>
-                    Hủy bỏ
-                  </button>
-                  <button
-                    type="button"
-                    className="management-primary-button"
-                    onClick={handleConfirmRegister}
-                    disabled={registering}
-                  >
-                    {registering ? 'Đang kích hoạt...' : 'Xác nhận đăng ký'}
-                  </button>
+      <ManagementModal
+        isOpen={Boolean(selectedPlan)}
+        onClose={handleCloseModal}
+        title="Xác nhận Đăng ký Gói tập"
+        titleId="plan-confirm-modal-title"
+        isSubmitting={registering}
+      >
+        <div className="modal-body">
+          {registerSuccess ? (
+            <div className="management-error" style={{ background: 'var(--color-success-bg)', borderColor: 'var(--color-success-border)', color: 'var(--color-success)' }}>
+              <i className="bi bi-check-circle-fill fs-5"></i>
+              <div>{registerSuccess}</div>
+            </div>
+          ) : (
+            <>
+              {registerError && (
+                <div className="management-error">
+                  <i className="bi bi-exclamation-triangle"></i>
+                  <div>{registerError}</div>
                 </div>
               )}
-            </div>
-          </div>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '14px', fontSize: '14px' }}>
+                Bạn có chắc muốn đăng ký gói tập sau đây?
+              </p>
+              {selectedPlan && (
+                <div style={{ padding: '16px', background: 'var(--page-background)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', marginBottom: '14px' }}>
+                  <div style={{ fontWeight: 750, color: 'var(--text-primary)', fontSize: '16px' }}>
+                    {selectedPlan.name}
+                  </div>
+                  <div style={{ color: 'var(--color-primary)', fontWeight: 750, fontSize: '26px', marginTop: '4px', fontVariantNumeric: 'tabular-nums' }}>
+                    {formatVnd(selectedPlan.price)}
+                  </div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '11.5px', marginTop: '4px' }}>
+                    <i className="bi bi-clock me-1"></i> Thời hạn sử dụng: {selectedPlan.duration_days} ngày
+                  </div>
+                </div>
+              )}
+              <div style={{ color: 'var(--text-muted)', fontSize: '11.5px' }}>
+                * Chế độ kiểm thử: Gói tập sẽ được tự động kích hoạt ngay lập tức và sinh hóa đơn đã thanh toán.
+              </div>
+            </>
+          )}
         </div>
-      )}
+        {!registerSuccess && (
+          <div className="modal-footer">
+            <button type="button" className="management-secondary-button" onClick={handleCloseModal} disabled={registering}>
+              Hủy bỏ
+            </button>
+            <button
+              type="button"
+              className="management-primary-button"
+              onClick={handleConfirmRegister}
+              disabled={registering}
+            >
+              {registering ? 'Đang kích hoạt...' : 'Xác nhận đăng ký'}
+            </button>
+          </div>
+        )}
+      </ManagementModal>
     </div>
   )
 }

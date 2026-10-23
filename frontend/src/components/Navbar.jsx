@@ -1,7 +1,17 @@
+import { useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 
 export default function Navbar({ onMenuToggle }) {
-  const { user, isAdmin, logout } = useAuth()
+  const { user, isAdmin, isTrainer, logout } = useAuth()
+
+  useEffect(() => {
+    document.documentElement.removeAttribute('data-theme')
+    localStorage.removeItem('soa-theme')
+  }, [])
+
+  const roleLabel = isAdmin ? 'Quản trị viên' : isTrainer ? 'Huấn luyện viên' : 'Hội viên'
+  const roleAvatarClass = isAdmin ? 'is-admin' : isTrainer ? 'is-trainer' : 'is-member'
+  const roleInitial = isAdmin ? 'A' : isTrainer ? 'T' : 'M'
 
   return (
     <nav className="app-navbar">
@@ -17,29 +27,29 @@ export default function Navbar({ onMenuToggle }) {
 
       <div className="app-navbar-meta">
         <span
-          className={`admin-avatar ${isAdmin ? 'is-admin' : 'is-member'}`}
-          title={user?.email}
+          className={`admin-avatar ${roleAvatarClass}`}
+          title={`${roleLabel} - ${user?.email}`}
         >
-          {isAdmin ? 'A' : 'M'}
+          {roleInitial}
         </span>
 
-        <div className="d-flex flex-column text-start ms-1 d-none d-md-block" style={{ lineHeight: 1.2 }}>
-          <span className="fw-semibold small text-dark">
-            {isAdmin ? 'Quản trị viên' : 'Hội viên'}
+        <div className="navbar-user-block">
+          <span className="navbar-user-role">
+            {roleLabel}
           </span>
-          <span className="text-muted" style={{ fontSize: '0.75rem' }}>
+          <span className="navbar-user-email">
             {user?.email}
           </span>
         </div>
 
         <button
           type="button"
-          className="btn btn-outline-danger btn-sm ms-3 d-flex align-items-center py-1 px-2 rounded-2"
+          className="navbar-logout-btn"
           onClick={logout}
           title="Đăng xuất"
         >
-          <i className="bi bi-box-arrow-right me-1"></i>
-          <span className="d-none d-sm-inline">Đăng xuất</span>
+          <i className="bi bi-box-arrow-right"></i>
+          <span>Đăng xuất</span>
         </button>
       </div>
     </nav>

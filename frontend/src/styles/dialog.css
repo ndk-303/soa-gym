@@ -37,7 +37,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  font-size: 19px;
+  font-size: 16px;
 }
 
 .confirm-dialog-icon.is-danger {

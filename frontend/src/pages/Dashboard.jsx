@@ -109,10 +109,7 @@ export default function Dashboard({ onTabChange }) {
   return (
     <div className="dashboard-page">
       <div className="dashboard-header">
-        <div>
-          <h1>Tổng quan hệ thống</h1>
-          <p>Bảng điều khiển hoạt động vận hành, hội viên và tài chính tại SOA Gym Center</p>
-        </div>
+        <h1>Tổng quan hệ thống</h1>
         <button className="refresh-button" type="button" onClick={loadOverview} disabled={stats.loading}>
           <i className={`bi ${stats.loading ? 'bi-arrow-repeat spin' : 'bi-arrow-clockwise'}`}></i>
           Làm mới
@@ -125,22 +122,6 @@ export default function Dashboard({ onTabChange }) {
           <div>{stats.error}. Vui lòng kiểm tra kết nối backend.</div>
         </div>
       )}
-
-      {/* Quick Action Navigation */}
-      <div className="quick-actions-bar">
-        <button type="button" className="quick-action-btn" onClick={() => onTabChange('members')}>
-          <i className="bi bi-person-plus"></i> Thêm hội viên
-        </button>
-        <button type="button" className="quick-action-btn" onClick={() => onTabChange('invoices')}>
-          <i className="bi bi-receipt"></i> Tạo hóa đơn
-        </button>
-        <button type="button" className="quick-action-btn" onClick={() => onTabChange('slots')}>
-          <i className="bi bi-clock"></i> Lên lịch ca tập
-        </button>
-        <button type="button" className="quick-action-btn" onClick={() => onTabChange('attendance')}>
-          <i className="bi bi-check2-circle"></i> Điểm danh ngay
-        </button>
-      </div>
 
       {/* KPI Metric Grid */}
       <div className="kpi-grid">

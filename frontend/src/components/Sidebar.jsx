@@ -1,7 +1,7 @@
 import { useAuth } from '../context/AuthContext'
 
 export default function Sidebar({ activeTab, onTabChange, isOpen }) {
-  const { isAdmin } = useAuth()
+  const { isAdmin, isTrainer } = useAuth()
 
   const adminMenuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'bi-grid-1x2', section: 'Tổng quan' },
@@ -16,6 +16,14 @@ export default function Sidebar({ activeTab, onTabChange, isOpen }) {
     { id: 'payments', label: 'Thanh toán', icon: 'bi-credit-card', section: 'Tài chính' },
   ]
 
+  const trainerMenuItems = [
+    { id: 'dashboard', label: 'Tổng quan', icon: 'bi-grid-1x2', section: 'HLV Portal' },
+    { id: 'schedule', label: 'Lịch dạy & Ca tập', icon: 'bi-clock', section: 'Giảng dạy' },
+    { id: 'classes', label: 'Lớp phụ trách', icon: 'bi-calendar-event', section: 'Giảng dạy' },
+    { id: 'trainees', label: 'Học viên & Đặt chỗ', icon: 'bi-people', section: 'Học viên' },
+    { id: 'attendance', label: 'Điểm danh ca tập', icon: 'bi-qr-code-scan', section: 'Học viên' },
+  ]
+
   const memberMenuItems = [
     { id: 'dashboard', label: 'Tổng quan', icon: 'bi-grid-1x2', section: 'Cá nhân' },
     { id: 'plans', label: 'Gói tập', icon: 'bi-card-list', section: 'Dịch vụ' },
@@ -23,7 +31,7 @@ export default function Sidebar({ activeTab, onTabChange, isOpen }) {
     { id: 'history', label: 'Lịch sử giao dịch', icon: 'bi-receipt', section: 'Tài chính' },
   ]
 
-  const menuItems = isAdmin ? adminMenuItems : memberMenuItems
+  const menuItems = isAdmin ? adminMenuItems : isTrainer ? trainerMenuItems : memberMenuItems
 
   const sections = Array.from(new Set(menuItems.map((item) => item.section)))
 
@@ -59,16 +67,9 @@ export default function Sidebar({ activeTab, onTabChange, isOpen }) {
       </div>
 
       <div className="sidebar-footer">
-        <span className={`sidebar-footer-icon ${isAdmin ? 'is-admin' : 'is-member'}`}>
-          <i className={`bi ${isAdmin ? 'bi-shield-check' : 'bi-person-badge'}`}></i>
-        </span>
-        <div>
-          <div className="sidebar-footer-title">
-            {isAdmin ? 'Quản trị viên' : 'Hội viên'}
-          </div>
-          <div className="sidebar-footer-text">
-            {isAdmin ? 'Đầy đủ quyền CRUD' : 'Khu vực cá nhân'}
-          </div>
+        <div className="sidebar-status-tag">
+          <span className="status-dot"></span>
+          <span>SOA Gym v1.0</span>
         </div>
       </div>
     </aside>

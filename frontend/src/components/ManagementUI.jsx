@@ -1,20 +1,18 @@
+import { useEffect, useRef } from 'react'
 import LoadingSpinner from './LoadingSpinner'
 
 export function ManagementHeader({ title, description, onRefresh, onAdd, addLabel, count }) {
   return (
     <div className="management-header">
-      <div>
+      <div className="management-title-block">
         <div className="management-title-row">
           <h1>{title}</h1>
-          {count !== undefined && count !== null && (
-            <span className="management-count-badge">{count} bản ghi</span>
-          )}
         </div>
         {description && <p className="management-description">{description}</p>}
       </div>
       <div className="management-header-actions">
         {onRefresh && (
-          <button className="management-secondary-button" type="button" onClick={onRefresh}>
+          <button className="management-secondary-button" type="button" onClick={onRefresh} title="Tải lại dữ liệu">
             <i className="bi bi-arrow-clockwise"></i> Làm mới
           </button>
         )}
@@ -40,7 +38,34 @@ export function ManagementFilterBar({
   filteredCount = 0,
   onReset,
 }) {
+  const searchInputRef = useRef(null)
   const isFiltered = Boolean(searchTerm.trim() || (filterValue && filterValue !== 'all'))
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Shortcut '/' to focus search when not in an editable control
+      if (
+        e.key === '/' &&
+        !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) &&
+        !document.activeElement?.isContentEditable
+      ) {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+        searchInputRef.current?.select()
+      }
+      // Escape inside search input clears or blurs
+      if (e.key === 'Escape' && document.activeElement === searchInputRef.current) {
+        if (searchTerm) {
+          onSearchChange?.('')
+        } else {
+          searchInputRef.current?.blur()
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [searchTerm, onSearchChange])
 
   return (
     <div className="management-filter-bar">
@@ -48,6 +73,7 @@ export function ManagementFilterBar({
         <div className="management-search-wrapper">
           <i className="bi bi-search management-search-icon" aria-hidden="true"></i>
           <input
+            ref={searchInputRef}
             type="search"
             className="management-search-input"
             value={searchTerm}
@@ -55,7 +81,7 @@ export function ManagementFilterBar({
             placeholder={searchPlaceholder}
             aria-label={searchPlaceholder}
           />
-          {searchTerm && (
+          {searchTerm ? (
             <button
               type="button"
               className="management-search-clear"
@@ -64,6 +90,10 @@ export function ManagementFilterBar({
             >
               <i className="bi bi-x"></i>
             </button>
+          ) : (
+            <span className="management-search-shortcut" title="Phím tắt: /" aria-hidden="true">
+              /
+            </span>
           )}
         </div>
 
@@ -85,27 +115,103 @@ export function ManagementFilterBar({
         )}
       </div>
 
-      <div className="management-filter-summary">
-        {isFiltered ? (
-          <>
-            <span className="management-filter-count">
-              Hiển thị <strong>{filteredCount}</strong> / {totalCount} bản ghi
-            </span>
-            {onReset && (
-              <button
-                type="button"
-                className="management-reset-button"
-                onClick={onReset}
-              >
-                <i className="bi bi-arrow-counterclockwise"></i> Đặt lại
-              </button>
-            )}
-          </>
-        ) : (
-          <span className="management-filter-count is-muted">
-            Tổng số: <strong>{totalCount}</strong> bản ghi
+      {isFiltered && (
+        <div className="management-filter-summary">
+          <span className="management-filter-count">
+            Khớp <strong>{filteredCount}</strong> / {totalCount}
           </span>
-        )}
+          {onReset && (
+            <button
+              type="button"
+              className="management-reset-button"
+              onClick={onReset}
+              title="Đặt lại bộ lọc"
+            >
+              <i className="bi bi-arrow-counterclockwise"></i> Đặt lại
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function ManagementModal({
+  isOpen,
+  onClose,
+  title,
+  titleId = 'management-modal-title',
+  children,
+  dialogClassName = 'modal-dialog-centered',
+  isSubmitting = false,
+}) {
+  const modalContentRef = useRef(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    // Lock background scrolling
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    // Auto focus first interactive element in modal
+    const timer = setTimeout(() => {
+      if (modalContentRef.current) {
+        const focusable = modalContentRef.current.querySelector(
+          'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button.btn-close'
+        )
+        focusable?.focus()
+      }
+    }, 60)
+
+    // Keydown handler for Escape key
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && !isSubmitting) {
+        onClose?.()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      clearTimeout(timer)
+      document.body.style.overflow = originalOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen, isSubmitting, onClose])
+
+  if (!isOpen) return null
+
+  return (
+    <div
+      className="modal show d-block"
+      tabIndex="-1"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(2px)' }}
+      onClick={(e) => {
+        // Prevent accidental closing if clicking inside modal content
+        if (e.target === e.currentTarget && !isSubmitting) {
+          onClose?.()
+        }
+      }}
+    >
+      <div className={`modal-dialog ${dialogClassName}`}>
+        <div ref={modalContentRef} className="modal-content border-0 shadow">
+          <div className="modal-header">
+            <h2 className="modal-title fs-5 fw-bold" id={titleId}>
+              {title}
+            </h2>
+            <button
+              type="button"
+              className="btn-close"
+              onClick={onClose}
+              disabled={isSubmitting}
+              aria-label="Đóng"
+            ></button>
+          </div>
+          {children}
+        </div>
       </div>
     </div>
   )
@@ -136,7 +242,7 @@ export function ManagementTable({
           <LoadingSpinner message={loadingMessage} />
         ) : isEmpty ? (
           <div className="management-empty">
-            <i className={`bi ${emptyIcon}`}></i>
+            <i className={`bi ${emptyIcon} management-empty-icon`}></i>
             <p>{emptyMessage}</p>
             {emptyAction}
           </div>
@@ -152,14 +258,18 @@ export function ManagementTable({
             </colgroup>
             <thead>
               <tr>
-                {columns.map((column) => (
-                  <th
-                    key={column.key}
-                    className={`${alignmentClasses[column.align || 'left']} ${column.className || ''}`.trim()}
-                  >
-                    {column.label}
-                  </th>
-                ))}
+                {columns.map((column) => {
+                  const isAction = column.key === 'actions'
+                  const alignClass = alignmentClasses[column.align || (isAction ? 'center' : 'left')]
+                  return (
+                    <th
+                      key={column.key}
+                      className={`${alignClass} ${isAction ? 'actions-col' : ''} ${column.className || ''}`.trim()}
+                    >
+                      {column.label}
+                    </th>
+                  )
+                })}
               </tr>
             </thead>
             <tbody>{children}</tbody>

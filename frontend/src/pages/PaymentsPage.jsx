@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { paymentsApi, invoicesApi, membersApi } from '../services/api'
-import { ActionMenu, ManagementHeader, ManagementTable, ManagementFilterBar } from '../components/ManagementUI'
+import { ActionMenu, ManagementHeader, ManagementTable, ManagementFilterBar, ManagementModal } from '../components/ManagementUI'
 import { formatVnd } from '../components/managementUtils'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { useToast } from '../context/ToastContext'
 
 export default function PaymentsPage() {
+  const toast = useToast()
   const [payments, setPayments] = useState([])
   const [invoices, setInvoices] = useState([])
   const [members, setMembers] = useState([])
@@ -94,17 +96,31 @@ export default function PaymentsPage() {
     e.preventDefault()
     setSubmitting(true)
     setFormError(null)
+
+    if (!formData.invoice_id) {
+      setFormError('Vui lòng chọn hóa đơn cần thanh toán')
+      setSubmitting(false)
+      return
+    }
+    if (formData.amount === '' || Number(formData.amount) <= 0) {
+      setFormError('Số tiền thanh toán phải lớn hơn 0')
+      setSubmitting(false)
+      return
+    }
+
     try {
       const payload = {
         invoice_id: Number(formData.invoice_id),
         amount: Number(formData.amount),
         payment_method: formData.payment_method,
-        notes: formData.notes,
+        notes: formData.notes?.trim() || '',
       }
       if (editingId) {
         await paymentsApi.update(editingId, payload)
+        toast.success('Cập nhật thanh toán thành công')
       } else {
         await paymentsApi.create(payload)
+        toast.success('Ghi nhận thanh toán thành công')
       }
       handleCloseModal()
       fetchData()
@@ -125,10 +141,13 @@ export default function PaymentsPage() {
     try {
       await paymentsApi.delete(deleteConfirm.id)
       setDeleteConfirm({ isOpen: false, id: null, loading: false })
+      toast.success('Đã xóa bản ghi thanh toán')
       fetchData()
     } catch (err) {
       setDeleteConfirm({ isOpen: false, id: null, loading: false })
-      setError('Lỗi xóa: ' + (err.response?.data?.detail || err.message))
+      const errorMsg = 'Lỗi xóa: ' + (err.response?.data?.detail || err.message)
+      setError(errorMsg)
+      toast.error(errorMsg)
     }
   }
 
@@ -137,10 +156,10 @@ export default function PaymentsPage() {
 
   const methodOptions = [
     { value: 'all', label: 'Tất cả phương thức' },
-    { value: 'cash', label: 'Tiền mặt (cash)' },
-    { value: 'bank_transfer', label: 'Chuyển khoản (bank_transfer)' },
+    { value: 'cash', label: 'Tiền mặt' },
+    { value: 'bank_transfer', label: 'Chuyển khoản ngân hàng' },
     { value: 'vietqr', label: 'VietQR' },
-    { value: 'credit_card', label: 'Thẻ tín dụng (credit_card)' },
+    { value: 'credit_card', label: 'Thẻ tín dụng' },
   ]
 
   const filteredPayments = useMemo(() => {
@@ -170,11 +189,9 @@ export default function PaymentsPage() {
     <div>
       <ManagementHeader
         title="Thanh toán"
-        description="Lịch sử thu tiền và phương thức thanh toán theo từng hóa đơn"
         onRefresh={fetchData}
         onAdd={handleOpenAdd}
         addLabel="Ghi nhận thanh toán"
-        count={payments.length}
       />
 
       {error && (
@@ -197,13 +214,14 @@ export default function PaymentsPage() {
       />
 
       <ManagementTable
+        minWidth={720}
         columns={[
-          { key: 'payment', label: 'Mã giao dịch', width: '21%' },
-          { key: 'invoice', label: 'Hóa đơn / Hội viên', width: '21%' },
-          { key: 'amount', label: 'Số tiền', width: '15%', align: 'right' },
-          { key: 'method', label: 'Phương thức', width: '15%' },
-          { key: 'notes', label: 'Ghi chú', width: '13%' },
-          { key: 'actions', label: 'Hành động', width: '190px', align: 'center' },
+          { key: 'payment', label: 'Mã giao dịch', width: '14%' },
+          { key: 'invoice', label: 'Hóa đơn / Hội viên', width: '26%' },
+          { key: 'amount', label: 'Số tiền', width: '16%' },
+          { key: 'method', label: 'Phương thức', width: '16%' },
+          { key: 'notes', label: 'Ghi chú', width: '14%' },
+          { key: 'actions', label: 'Hành động', width: '14%', align: 'center' },
         ]}
         loading={loading}
         loadingMessage="Đang tải dữ liệu Thanh toán..."
@@ -221,135 +239,121 @@ export default function PaymentsPage() {
             </button>
           ) : null
         }
-        minWidth={900}
       >
         {filteredPayments.map((p) => {
-                  const linkedInv = p.invoice || invoiceMap[p.invoice_id]
-                  const linkedMember = p.member || linkedInv?.member || (linkedInv ? memberMap[linkedInv.member_id] : null)
-                  return (
-                    <tr key={p.id}>
-                      <td><span className="technical-id">GD #{p.id}</span></td>
-                      <td>
-                        <div className="primary-cell">Hóa đơn #{p.invoice_id}</div>
-                        <div className="secondary-cell">{linkedMember ? linkedMember.full_name : `Hội viên #${linkedInv?.member_id || '—'}`}</div>
-                      </td>
-                      <td className="money">{formatVnd(p.amount)}</td>
-                      <td>
-                        <span className="semantic-badge">{({ cash: 'Tiền mặt', bank_transfer: 'Chuyển khoản', vietqr: 'VietQR', credit_card: 'Thẻ tín dụng' })[p.payment_method] || p.payment_method}</span>
-                      </td>
-                      <td className="table-note">{p.notes || '—'}</td>
-                      <td className="text-end">
-                        <ActionMenu onEdit={() => handleOpenEdit(p)} onDelete={() => handleOpenDelete(p.id)} />
-                      </td>
-                    </tr>
-                  )
-                })}
+          const linkedInv = p.invoice || invoiceMap[p.invoice_id]
+          const linkedMember = p.member || linkedInv?.member || (linkedInv ? memberMap[linkedInv.member_id] : null)
+          return (
+            <tr key={p.id}>
+              <td><span className="technical-id">GD #{p.id}</span></td>
+              <td>
+                <div className="primary-cell">Hóa đơn #{p.invoice_id}</div>
+                <div className="secondary-cell">{linkedMember ? linkedMember.full_name : `Hội viên #${linkedInv?.member_id || '—'}`}</div>
+              </td>
+              <td className="money">{formatVnd(p.amount)}</td>
+              <td>
+                <span className="semantic-badge">{({ cash: 'Tiền mặt', bank_transfer: 'Chuyển khoản', vietqr: 'VietQR', credit_card: 'Thẻ tín dụng' })[p.payment_method] || p.payment_method}</span>
+              </td>
+              <td className="table-note">{p.notes || '—'}</td>
+              <td className="text-center actions-cell">
+                <ActionMenu onEdit={() => handleOpenEdit(p)} onDelete={() => handleOpenDelete(p.id)} />
+              </td>
+            </tr>
+          )
+        })}
       </ManagementTable>
 
-      {showModal && (
-        <div
-          className="modal show d-block"
-          tabIndex="-1"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="payment-modal-title"
-          style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}
-        >
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content border-0 shadow">
-              <div className="modal-header">
-                <h5 className="modal-title fw-bold" id="payment-modal-title">
-                  {editingId ? `Cập nhật Thanh toán #${editingId}` : 'Ghi nhận Thanh toán mới'}
-                </h5>
-                <button type="button" className="btn-close" onClick={handleCloseModal} aria-label="Đóng"></button>
+      <ManagementModal
+        isOpen={showModal}
+        onClose={handleCloseModal}
+        title={editingId ? `Cập nhật Thanh toán #${editingId}` : 'Ghi nhận Thanh toán mới'}
+        titleId="payment-modal-title"
+        isSubmitting={submitting}
+      >
+        <form onSubmit={handleSave}>
+          <div className="modal-body">
+            {formError && (
+              <div className="alert alert-danger py-2 small mb-3">
+                <i className="bi bi-exclamation-triangle me-1"></i> {formError}
               </div>
-              <form onSubmit={handleSave}>
-                <div className="modal-body">
-                  {formError && (
-                    <div className="alert alert-danger py-2 small mb-3">
-                      <i className="bi bi-exclamation-triangle me-1"></i> {formError}
-                    </div>
-                  )}
-                  <div className="mb-3">
-                    <label htmlFor="payment-invoice-select" className="form-label small fw-bold">Chọn Hóa đơn cần thanh toán</label>
-                    <select
-                      id="payment-invoice-select"
-                      className="form-select"
-                      value={formData.invoice_id}
-                      onChange={(e) => handleInvoiceSelect(e.target.value)}
-                      required
-                    >
-                      <option value="">-- Chọn hóa đơn --</option>
-                      {invoices.map((inv) => {
-                        const m = memberMap[inv.member_id]
-                        const remaining = Math.max(0, inv.amount - inv.amount_paid)
-                        return (
-                          <option key={inv.id} value={inv.id}>
-                            Hóa đơn #{inv.id} - {m ? m.full_name : `Hội viên #${inv.member_id}`} (Tổng: {formatVnd(inv.amount)}, Còn thiếu: {formatVnd(remaining)})
-                          </option>
-                        )
-                      })}
-                    </select>
-                  </div>
-                  <div className="mb-3">
-                    <label htmlFor="payment-amount" className="form-label small fw-bold">Số tiền thanh toán (VNĐ)</label>
-                    <input
-                      id="payment-amount"
-                      type="number"
-                      min="1000"
-                      step="1000"
-                      className="form-control"
-                      value={formData.amount}
-                      onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="mb-3">
-                    <label htmlFor="payment-method-select" className="form-label small fw-bold">Phương thức thanh toán</label>
-                    <select
-                      id="payment-method-select"
-                      className="form-select"
-                      value={formData.payment_method}
-                      onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
-                    >
-                      <option value="cash">Tiền mặt (cash)</option>
-                      <option value="bank_transfer">Chuyển khoản (bank_transfer)</option>
-                      <option value="vietqr">VietQR</option>
-                      <option value="credit_card">Thẻ tín dụng (credit_card)</option>
-                    </select>
-                  </div>
-                  <div className="mb-2">
-                    <label htmlFor="payment-notes" className="form-label small fw-bold">Ghi chú</label>
-                    <input
-                      id="payment-notes"
-                      type="text"
-                      className="form-control"
-                      value={formData.notes}
-                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                      placeholder="Nội dung ghi chú chuyển khoản / giao dịch"
-                    />
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="management-secondary-button" onClick={handleCloseModal}>
-                    Hủy
-                  </button>
-                  <button type="submit" className="management-primary-button" disabled={submitting}>
-                    {submitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Thêm mới')}
-                  </button>
-                </div>
-              </form>
+            )}
+            <div className="mb-3">
+              <label htmlFor="payment-invoice-select" className="form-label small fw-bold">Chọn Hóa đơn cần thanh toán</label>
+              <select
+                id="payment-invoice-select"
+                className="form-select"
+                value={formData.invoice_id}
+                onChange={(e) => handleInvoiceSelect(e.target.value)}
+                required
+              >
+                <option value="">-- Chọn hóa đơn --</option>
+                {invoices.map((inv) => {
+                  const m = memberMap[inv.member_id]
+                  const remaining = Math.max(0, inv.amount - inv.amount_paid)
+                  return (
+                    <option key={inv.id} value={inv.id}>
+                      Hóa đơn #{inv.id} - {m ? m.full_name : `Hội viên #${inv.member_id}`} (Tổng: {formatVnd(inv.amount)}, Còn thiếu: {formatVnd(remaining)})
+                    </option>
+                  )
+                })}
+              </select>
+            </div>
+            <div className="mb-3">
+              <label htmlFor="payment-amount" className="form-label small fw-bold">Số tiền thanh toán (VNĐ)</label>
+              <input
+                id="payment-amount"
+                type="number"
+                min="1000"
+                step="1000"
+                className="form-control"
+                value={formData.amount}
+                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                required
+              />
+            </div>
+            <div className="mb-3">
+              <label htmlFor="payment-method-select" className="form-label small fw-bold">Phương thức thanh toán</label>
+              <select
+                id="payment-method-select"
+                className="form-select"
+                value={formData.payment_method}
+                onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
+              >
+                <option value="cash">Tiền mặt</option>
+                <option value="bank_transfer">Chuyển khoản ngân hàng</option>
+                <option value="vietqr">VietQR</option>
+                <option value="credit_card">Thẻ tín dụng</option>
+              </select>
+            </div>
+            <div className="mb-2">
+              <label htmlFor="payment-notes" className="form-label small fw-bold">Ghi chú giao dịch</label>
+              <input
+                id="payment-notes"
+                type="text"
+                className="form-control"
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Nội dung ghi chú chuyển khoản / giao dịch (ví dụ: Chuyển khoản Vietcombank)"
+              />
             </div>
           </div>
-        </div>
-      )}
+          <div className="modal-footer">
+            <button type="button" className="management-secondary-button" onClick={handleCloseModal} disabled={submitting}>
+              Hủy
+            </button>
+            <button type="submit" className="management-primary-button" disabled={submitting}>
+              {submitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Thêm mới')}
+            </button>
+          </div>
+        </form>
+      </ManagementModal>
 
       <ConfirmDialog
         isOpen={deleteConfirm.isOpen}
-        title="Xác nhận xóa Giao dịch Thanh toán"
-        message={`Bạn có chắc muốn xóa Giao dịch Thanh toán #${deleteConfirm.id}? Thao tác này không thể hoàn tác.`}
+        title="Xóa giao dịch thanh toán"
+        message={`Giao dịch #${deleteConfirm.id} sẽ bị xóa khỏi sổ quỹ. Số tiền đã thanh toán trên hóa đơn tương ứng có thể cần được đối soát lại.`}
         confirmText="Xóa giao dịch"
-        cancelText="Hủy bỏ"
+        cancelText="Giữ lại"
         variant="danger"
         loading={deleteConfirm.loading}
         onConfirm={handleConfirmDelete}
