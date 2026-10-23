@@ -8,6 +8,7 @@ import './styles/dashboard.css'
 import './styles/management.css'
 import './styles/calendar.css'
 import './styles/member.css'
+import './styles/trainer.css'
 import './styles/dialog.css'
 import App from './App.jsx'
 

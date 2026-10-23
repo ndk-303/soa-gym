@@ -170,7 +170,7 @@ export default function MemberDashboard({ onTabChange, currentMember, memberLoad
             <span className="kpi-icon"><i className="bi bi-card-checklist"></i></span>
           </div>
           <div>
-            <div className="kpi-card-value" style={{ fontSize: '20px', lineHeight: 1.3 }}>
+            <div className="kpi-card-value">
               {currentPlan ? currentPlan.name : 'Chưa có gói'}
             </div>
             <div className="kpi-card-label d-flex align-items-center justify-content-between mt-2">
@@ -186,7 +186,7 @@ export default function MemberDashboard({ onTabChange, currentMember, memberLoad
             <span className="kpi-icon"><i className="bi bi-check2-all"></i></span>
           </div>
           <div>
-            <div className="kpi-card-value" style={{ color: 'var(--color-success)' }}>
+            <div className="kpi-card-value">
               {loading ? <span className="kpi-skeleton"></span> : `${uniqueAttendanceDays} ngày`}
             </div>
             <div className="kpi-card-label">
@@ -201,10 +201,7 @@ export default function MemberDashboard({ onTabChange, currentMember, memberLoad
             <span className="kpi-icon"><i className="bi bi-hourglass-split"></i></span>
           </div>
           <div>
-            <div
-              className="kpi-card-value"
-              style={{ color: isPendingWarning ? 'var(--color-warning)' : 'var(--color-primary)' }}
-            >
+            <div className="kpi-card-value">
               {loading ? (
                 <span className="kpi-skeleton"></span>
               ) : currentPlan ? (
@@ -225,7 +222,7 @@ export default function MemberDashboard({ onTabChange, currentMember, memberLoad
             <span className="kpi-icon"><i className="bi bi-calendar-event"></i></span>
           </div>
           <div>
-            <div className="kpi-card-value" style={{ fontSize: '20px' }}>
+            <div className="kpi-card-value">
               {loading ? (
                 <span className="kpi-skeleton"></span>
               ) : currentPlan ? (

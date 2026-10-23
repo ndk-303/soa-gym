@@ -4,8 +4,10 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 import StatusBadge from '../../components/StatusBadge'
 import { formatSchedule } from '../../components/managementUtils'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import { useToast } from '../../context/ToastContext'
 
 export default function MemberClassesPage({ currentMember }) {
+  const toast = useToast()
   const [activeTab, setActiveTab] = useState('explore') // 'explore' | 'my-classes'
   const [classes, setClasses] = useState([])
   const [slots, setSlots] = useState([])
@@ -73,10 +75,13 @@ export default function MemberClassesPage({ currentMember }) {
         status: 'confirmed',
       })
       setActionSuccess('Đặt chỗ ca tập thành công!')
+      toast.success('Đặt chỗ ca tập thành công!')
       await fetchData()
       setTimeout(() => setActionSuccess(null), 3000)
     } catch (err) {
-      setActionError(err.response?.data?.detail || err.message || 'Lỗi đặt chỗ ca tập')
+      const errorMsg = err.response?.data?.detail || err.message || 'Lỗi đặt chỗ ca tập'
+      setActionError(errorMsg)
+      toast.error(errorMsg)
       setTimeout(() => setActionError(null), 4000)
     } finally {
       setBookingSlotId(null)
@@ -96,11 +101,14 @@ export default function MemberClassesPage({ currentMember }) {
       await bookingsApi.delete(cancelConfirm.id)
       setCancelConfirm({ isOpen: false, id: null, loading: false })
       setActionSuccess('Đã hủy đặt chỗ thành công!')
+      toast.success('Đã hủy đặt chỗ thành công!')
       await fetchData()
       setTimeout(() => setActionSuccess(null), 3000)
     } catch (err) {
       setCancelConfirm({ isOpen: false, id: null, loading: false })
-      setActionError(err.response?.data?.detail || err.message || 'Lỗi hủy đặt chỗ')
+      const errorMsg = err.response?.data?.detail || err.message || 'Lỗi hủy đặt chỗ'
+      setActionError(errorMsg)
+      toast.error(errorMsg)
       setTimeout(() => setActionError(null), 4000)
     }
   }
@@ -281,7 +289,7 @@ export default function MemberClassesPage({ currentMember }) {
 
                     <h2 className="member-plan-title mb-3">{c.name}</h2>
 
-                    <div className="fw-semibold text-secondary mb-2" style={{ fontSize: '13px' }}>
+                    <div className="fw-semibold text-secondary mb-2" style={{ fontSize: '14px' }}>
                       Lịch ca tập sắp tới:
                     </div>
 
@@ -369,7 +377,7 @@ export default function MemberClassesPage({ currentMember }) {
                       <th style={{ width: '30%' }}>Lớp học</th>
                       <th style={{ width: '24%' }}>Thời gian học</th>
                       <th style={{ width: '16%' }}>Trạng thái</th>
-                      <th style={{ width: '16%' }} className="text-end">Hành động</th>
+                      <th style={{ width: '16%' }} className="text-center">Hành động</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -398,7 +406,7 @@ export default function MemberClassesPage({ currentMember }) {
                           <td>
                             <StatusBadge status={b.status} />
                           </td>
-                          <td className="text-end">
+                          <td className="text-center actions-cell">
                             <button
                               type="button"
                               className="row-action-button is-danger"
@@ -421,10 +429,10 @@ export default function MemberClassesPage({ currentMember }) {
 
       <ConfirmDialog
         isOpen={cancelConfirm.isOpen}
-        title="Xác nhận hủy đặt chỗ lớp học"
-        message="Bạn có chắc chắn muốn hủy đặt chỗ cho ca tập này? Suất đặt sẽ được giải phóng cho các hội viên khác."
+        title="Hủy đặt chỗ ca tập"
+        message="Suất tập của bạn sẽ được giải phóng ngay lập tức cho các hội viên khác trong danh sách chờ."
         confirmText="Hủy đặt chỗ"
-        cancelText="Giữ lại"
+        cancelText="Giữ lại lịch tập"
         variant="danger"
         loading={cancelConfirm.loading}
         onConfirm={handleConfirmCancel}

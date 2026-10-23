@@ -1,0 +1,163 @@
+/* ==========================================================================
+   Trainer Portal Styles
+   Consistent with SOA Gym Design System (Clean, Light Mode, Impeccable Polish)
+   ========================================================================== */
+
+.trainer-welcome-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--color-primary-border);
+}
+
+.trainer-card {
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.trainer-card:hover {
+  border-color: var(--color-primary-border);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
+}
+
+.trainer-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.trainer-class-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.trainer-class-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.trainer-class-desc {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 16px;
+  flex-grow: 1;
+}
+
+.trainer-card-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-color);
+}
+
+.trainer-stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.trainer-stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.trainer-stat-val {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Trainee Table Avatar & Meta */
+.trainee-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.trainee-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.trainee-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  line-height: 1.25;
+}
+
+.trainee-email {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Time pill in table */
+.slot-time-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.slot-time-pill i {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.slot-capacity-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.slot-capacity-pill.is-full {
+  color: var(--color-danger);
+}
+
+.slot-capacity-pill.is-available {
+  color: var(--color-success);
+}

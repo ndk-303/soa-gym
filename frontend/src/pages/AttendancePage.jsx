@@ -2,11 +2,13 @@ import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { attendanceApi, membersApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
-import { ActionMenu, ManagementHeader, ManagementTable, ManagementFilterBar } from '../components/ManagementUI'
+import { ActionMenu, ManagementHeader, ManagementTable, ManagementFilterBar, ManagementModal } from '../components/ManagementUI'
 import { formatDateTime, toDatetimeLocalValue, fromDatetimeLocalValue, getNowDatetimeLocalValue } from '../components/managementUtils'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { useToast } from '../context/ToastContext'
 
 export default function AttendancePage() {
+  const toast = useToast()
   const { isAdmin } = useAuth()
   const [records, setRecords] = useState([])
 
@@ -88,18 +90,37 @@ export default function AttendancePage() {
     e.preventDefault()
     setSubmitting(true)
     setFormError(null)
+
+    if (!formData.member_id) {
+      setFormError('Vui lòng chọn hội viên')
+      setSubmitting(false)
+      return
+    }
+    if (!formData.check_in_time) {
+      setFormError('Vui lòng nhập thời gian check-in')
+      setSubmitting(false)
+      return
+    }
+    if (formData.check_out_time && new Date(formData.check_out_time) < new Date(formData.check_in_time)) {
+      setFormError('Thời gian check-out không thể trước thời gian check-in')
+      setSubmitting(false)
+      return
+    }
+
     try {
       const payload = {
         member_id: Number(formData.member_id),
         status: formData.status,
         check_in_time: fromDatetimeLocalValue(formData.check_in_time),
         check_out_time: formData.check_out_time ? fromDatetimeLocalValue(formData.check_out_time) : null,
-        notes: formData.notes,
+        notes: formData.notes?.trim() || '',
       }
       if (editingId) {
         await attendanceApi.update(editingId, payload)
+        toast.success('Cập nhật bản ghi điểm danh thành công')
       } else {
         await attendanceApi.create(payload)
+        toast.success('Ghi nhận điểm danh thành công')
       }
       handleCloseModal()
       fetchData()
@@ -120,10 +141,13 @@ export default function AttendancePage() {
     try {
       await attendanceApi.delete(deleteConfirm.id)
       setDeleteConfirm({ isOpen: false, id: null, loading: false })
+      toast.success('Đã xóa bản ghi điểm danh')
       fetchData()
     } catch (err) {
       setDeleteConfirm({ isOpen: false, id: null, loading: false })
-      setError('Lỗi xóa: ' + (err.response?.data?.detail || err.message))
+      const errorMsg = 'Lỗi xóa: ' + (err.response?.data?.detail || err.message)
+      setError(errorMsg)
+      toast.error(errorMsg)
     }
   }
 
@@ -131,8 +155,8 @@ export default function AttendancePage() {
 
   const statusOptions = [
     { value: 'all', label: 'Tất cả trạng thái' },
-    { value: 'checked_in', label: 'checked_in (Đang trong phòng)' },
-    { value: 'checked_out', label: 'checked_out (Đã check-out)' },
+    { value: 'checked_in', label: 'Đang trong phòng tập' },
+    { value: 'checked_out', label: 'Đã rời phòng' },
   ]
 
   const filteredRecords = useMemo(() => {
@@ -159,11 +183,9 @@ export default function AttendancePage() {
     <div>
       <ManagementHeader
         title="Điểm danh"
-        description="Theo dõi lượt check-in và check-out của hội viên tại phòng tập"
         onRefresh={fetchData}
         onAdd={isAdmin ? handleOpenAdd : undefined}
         addLabel="Ghi nhận check-in"
-        count={records.length}
       />
 
       {error && (
@@ -186,13 +208,14 @@ export default function AttendancePage() {
       />
 
       <ManagementTable
+        minWidth={isAdmin ? 740 : 620}
         columns={[
-          { key: 'member', label: 'Hội viên', width: isAdmin ? '21%' : '26%' },
-          { key: 'checkIn', label: 'Giờ check-in', width: isAdmin ? '21%' : '26%' },
-          { key: 'checkOut', label: 'Giờ check-out', width: isAdmin ? '15%' : '18%' },
-          { key: 'notes', label: 'Ghi chú', width: isAdmin ? '15%' : '16%' },
-          { key: 'status', label: 'Trạng thái', width: isAdmin ? '13%' : '14%' },
-          ...(isAdmin ? [{ key: 'actions', label: 'Hành động', width: '190px', align: 'center' }] : []),
+          { key: 'member', label: 'Hội viên', width: isAdmin ? '22%' : '26%' },
+          { key: 'checkIn', label: 'Giờ check-in', width: isAdmin ? '18%' : '20%' },
+          { key: 'checkOut', label: 'Giờ check-out', width: isAdmin ? '18%' : '20%' },
+          { key: 'notes', label: 'Ghi chú', width: isAdmin ? '16%' : '20%' },
+          { key: 'status', label: 'Trạng thái', width: isAdmin ? '12%' : '14%' },
+          ...(isAdmin ? [{ key: 'actions', label: 'Hành động', width: '14%', align: 'center' }] : []),
         ]}
         loading={loading}
         loadingMessage="Đang tải dữ liệu Điểm danh..."
@@ -210,7 +233,6 @@ export default function AttendancePage() {
             </button>
           ) : null
         }
-        minWidth={900}
       >
         {filteredRecords.map((r) => {
           const member = r.member || memberMap[r.member_id]
@@ -227,7 +249,7 @@ export default function AttendancePage() {
                 <StatusBadge status={r.status} />
               </td>
               {isAdmin && (
-                <td className="text-end">
+                <td className="text-center actions-cell">
                   <ActionMenu onEdit={() => handleOpenEdit(r)} onDelete={() => handleOpenDelete(r.id)} />
                 </td>
               )}
@@ -237,116 +259,103 @@ export default function AttendancePage() {
       </ManagementTable>
 
 
-      {showModal && (
-        <div
-          className="modal show d-block"
-          tabIndex="-1"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="att-modal-title"
-          style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}
-        >
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content border-0 shadow">
-              <div className="modal-header">
-                <h5 id="att-modal-title" className="modal-title fw-bold">
-                  {editingId ? `Cập nhật Điểm danh #${editingId}` : 'Ghi nhận Điểm danh (Check-in)'}
-                </h5>
-                <button type="button" className="btn-close" onClick={handleCloseModal} aria-label="Đóng"></button>
+      <ManagementModal
+        isOpen={showModal}
+        onClose={handleCloseModal}
+        title={editingId ? `Cập nhật Điểm danh #${editingId}` : 'Ghi nhận Điểm danh (Check-in)'}
+        titleId="att-modal-title"
+        isSubmitting={submitting}
+      >
+        <form onSubmit={handleSave}>
+          <div className="modal-body">
+            {formError && (
+              <div className="alert alert-danger py-2 small mb-3">
+                <i className="bi bi-exclamation-triangle me-1"></i> {formError}
               </div>
-              <form onSubmit={handleSave}>
-                <div className="modal-body">
-                  {formError && (
-                    <div className="alert alert-danger py-2 small mb-3">
-                      <i className="bi bi-exclamation-triangle me-1"></i> {formError}
-                    </div>
-                  )}
-                  <div className="mb-3">
-                    <label htmlFor="att-member-id" className="form-label small fw-bold">Chọn Hội viên</label>
-                    <select
-                      id="att-member-id"
-                      className="form-select"
-                      value={formData.member_id}
-                      onChange={(e) => setFormData({ ...formData, member_id: e.target.value })}
-                      required
-                    >
-                      <option value="">-- Chọn hội viên --</option>
-                      {members.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.full_name} ({m.email})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+            )}
+            <div className="mb-3">
+              <label htmlFor="att-member-id" className="form-label small fw-bold">Chọn Hội viên</label>
+              <select
+                id="att-member-id"
+                className="form-select"
+                value={formData.member_id}
+                onChange={(e) => setFormData({ ...formData, member_id: e.target.value })}
+                required
+              >
+                <option value="">-- Chọn hội viên --</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.full_name} ({m.email})
+                  </option>
+                ))}
+              </select>
+            </div>
 
-                  <div className="mb-3">
-                    <label htmlFor="att-check-in-time" className="form-label small fw-bold">Thời gian Check-in</label>
-                    <input
-                      id="att-check-in-time"
-                      type="datetime-local"
-                      className="form-control"
-                      value={formData.check_in_time}
-                      onChange={(e) => setFormData({ ...formData, check_in_time: e.target.value })}
-                      required
-                    />
-                  </div>
+            <div className="mb-3">
+              <label htmlFor="att-check-in-time" className="form-label small fw-bold">Thời gian Check-in</label>
+              <input
+                id="att-check-in-time"
+                type="datetime-local"
+                className="form-control"
+                value={formData.check_in_time}
+                onChange={(e) => setFormData({ ...formData, check_in_time: e.target.value })}
+                required
+              />
+            </div>
 
-                  <div className="mb-3">
-                    <label htmlFor="att-check-out-time" className="form-label small fw-bold">Thời gian Check-out</label>
-                    <input
-                      id="att-check-out-time"
-                      type="datetime-local"
-                      className="form-control"
-                      value={formData.check_out_time}
-                      onChange={(e) => setFormData({ ...formData, check_out_time: e.target.value })}
-                    />
-                  </div>
+            <div className="mb-3">
+              <label htmlFor="att-check-out-time" className="form-label small fw-bold">Thời gian Check-out</label>
+              <input
+                id="att-check-out-time"
+                type="datetime-local"
+                className="form-control"
+                value={formData.check_out_time}
+                onChange={(e) => setFormData({ ...formData, check_out_time: e.target.value })}
+              />
+            </div>
 
-                  <div className="mb-3">
-                    <label htmlFor="att-status" className="form-label small fw-bold">Trạng thái</label>
-                    <select
-                      id="att-status"
-                      className="form-select"
-                      value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    >
-                      <option value="checked_in">checked_in (Đang trong phòng tập)</option>
-                      <option value="checked_out">checked_out (Đã rời phòng tập)</option>
-                    </select>
-                  </div>
+            <div className="mb-3">
+              <label htmlFor="att-status" className="form-label small fw-bold">Trạng thái điểm danh</label>
+              <select
+                id="att-status"
+                className="form-select"
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              >
+                <option value="checked_in">Đang trong phòng tập</option>
+                <option value="checked_out">Đã rời phòng tập</option>
+              </select>
+            </div>
 
-                  <div className="mb-2">
-                    <label htmlFor="att-notes" className="form-label small fw-bold">Ghi chú</label>
-                    <input
-                      id="att-notes"
-                      type="text"
-                      className="form-control"
-                      value={formData.notes}
-                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                      placeholder="Ghi chú thêm nếu có"
-                    />
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="management-secondary-button" onClick={handleCloseModal}>
-                    Hủy
-                  </button>
-                  <button type="submit" className="management-primary-button" disabled={submitting}>
-                    {submitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Thêm mới')}
-                  </button>
-                </div>
-              </form>
+            <div className="mb-2">
+              <label htmlFor="att-notes" className="form-label small fw-bold">Ghi chú</label>
+              <input
+                id="att-notes"
+                type="text"
+                className="form-control"
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Ghi chú thêm nếu có (ví dụ: Huấn luyện viên kèm riêng)"
+              />
             </div>
           </div>
-        </div>
-      )}
+          <div className="modal-footer">
+            <button type="button" className="management-secondary-button" onClick={handleCloseModal} disabled={submitting}>
+              Hủy
+            </button>
+            <button type="submit" className="management-primary-button" disabled={submitting}>
+              {submitting ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Thêm mới')}
+            </button>
+          </div>
+        </form>
+      </ManagementModal>
 
       <ConfirmDialog
         isOpen={deleteConfirm.isOpen}
-        title="Xác nhận xóa bản ghi Điểm danh"
-        message={`Bạn có chắc muốn xóa bản ghi Điểm danh #${deleteConfirm.id}? Thao tác này không thể hoàn tác.`}
+        title="Xóa bản ghi điểm danh"
+        message={`Bản ghi điểm danh #${deleteConfirm.id} của hội viên sẽ bị xóa vĩnh viễn khỏi nhật ký ra/vào phòng tập.`}
         confirmText="Xóa bản ghi"
-        cancelText="Hủy bỏ"
+        cancelText="Giữ lại"
         variant="danger"
         loading={deleteConfirm.loading}
         onConfirm={handleConfirmDelete}
