@@ -2,9 +2,17 @@ import os
 import sys
 import time
 import signal
+import socket
 import subprocess
 from typing import List
 from dotenv import load_dotenv
+
+# Ensure utf-8 encoding on console if supported
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -56,6 +64,33 @@ SERVICES = [
 processes: List[subprocess.Popen] = []
 
 
+def find_python_executable() -> str:
+    # 1. If sys.executable has packages like jwt or is in .venv, use it
+    if sys.prefix != sys.base_prefix:
+        return sys.executable
+
+    # 2. Search common virtualenv paths relative to BASE_DIR
+    candidates = [
+        os.path.join(BASE_DIR, "..", "..", "..", ".venv", "Scripts", "python.exe"),
+        os.path.join(BASE_DIR, "..", "..", ".venv", "Scripts", "python.exe"),
+        os.path.join(BASE_DIR, "..", ".venv", "Scripts", "python.exe"),
+        os.path.join(BASE_DIR, ".venv", "Scripts", "python.exe"),
+        os.path.join(BASE_DIR, "..", "..", "..", "venv", "Scripts", "python.exe"),
+    ]
+    for cand in candidates:
+        abs_cand = os.path.abspath(cand)
+        if os.path.exists(abs_cand):
+            return abs_cand
+
+    return sys.executable
+
+
+def is_port_in_use(port: int, host: str = "127.0.0.1") -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        return s.connect_ex((host, port)) == 0
+
+
 def stop_all_processes():
     print("\n[!] Shutting down all services and API Gateway...")
     for proc in processes:
@@ -73,7 +108,7 @@ def stop_all_processes():
                 proc.kill()
             except Exception:
                 pass
-    print("[✓] All processes stopped cleanly.\n")
+    print("[OK] All processes stopped cleanly.\n")
 
 
 def signal_handler(sig, frame):
@@ -86,14 +121,19 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)
 
     print("=" * 70)
-    print("   GYM MANAGEMENT SYSTEM — SOA MICROSERVICES RUNNER")
+    print("   GYM MANAGEMENT SYSTEM - SOA MICROSERVICES RUNNER")
     print("=" * 70)
 
-    python_exec = sys.executable
+    python_exec = find_python_executable()
     gateway_port = int(os.getenv("GATEWAY_PORT", 8000))
-    host = os.getenv("GATEWAY_HOST", "0.0.0.0")
+    print(f"[*] Python Runtime: {python_exec}")
 
-    # Inherit loaded environment variables for all spawned microservices
+    # Check for busy ports before spawning
+    busy_ports = [s["port"] for s in SERVICES if is_port_in_use(s["port"])]
+    if busy_ports:
+        print(f"[!] Canh bao: Cac port sau dang bi chiem dung boi tien trinh khac: {busy_ports}")
+        print("    Vui long tat tien trinh cu hoac kiem tra bang Task Manager.\n")
+
     child_env = os.environ.copy()
 
     for s in SERVICES:
@@ -118,27 +158,40 @@ def main():
             cwd=cwd,
             env=child_env,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
         )
         processes.append(proc)
         time.sleep(0.3)
 
     print("-" * 70)
-    print(" [✓] All 6 Microservices and API Gateway are running!")
-    print(f" [✓] API Gateway Swagger UI: http://127.0.0.1:{gateway_port}/docs")
-    print(f" [✓] API Gateway Health Check: http://127.0.0.1:{gateway_port}/health")
-    print(" [✓] Frontend App: http://localhost:5173")
+    print(" [OK] All 6 Microservices and API Gateway are running!")
+    print(f" [OK] API Gateway Swagger UI: http://127.0.0.1:{gateway_port}/docs")
+    print(f" [OK] API Gateway Health Check: http://127.0.0.1:{gateway_port}/health")
+    print(" [OK] Frontend App: http://localhost:5173")
     print("-" * 70)
     print(" Press Ctrl + C to stop all services.\n")
+
+    reported_exits = set()
 
     try:
         while True:
             time.sleep(1)
-            # Check if any process exited unexpectedly
             for i, proc in enumerate(processes):
-                if proc.poll() is not None:
+                if proc.poll() is not None and i not in reported_exits:
+                    reported_exits.add(i)
                     name = SERVICES[i]["name"]
-                    print(f"[!] Warning: {name} exited with code {proc.returncode}")
+                    port = SERVICES[i]["port"]
+                    stderr_err = ""
+                    try:
+                        if proc.stderr:
+                            stderr_err = proc.stderr.read().decode("utf-8", errors="ignore").strip()
+                    except Exception:
+                        pass
+
+                    print(f"[!] Warning: {name} (port {port}) exited with code {proc.returncode}")
+                    if stderr_err:
+                        last_line = stderr_err.splitlines()[-1] if stderr_err.splitlines() else stderr_err
+                        print(f"    Chi tiet loi: {last_line}")
     except KeyboardInterrupt:
         stop_all_processes()
 

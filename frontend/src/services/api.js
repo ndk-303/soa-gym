@@ -18,8 +18,27 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
+// Auto-handle 401 Unauthorized (expired or invalid token)
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      const url = error.config?.url || ''
+      if (!url.includes('/login')) {
+        localStorage.removeItem('gym_token')
+        localStorage.removeItem('gym_user')
+        if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
+          window.location.href = '/'
+        }
+      }
+    }
+    return Promise.reject(error)
+  }
+)
+
 export const authApi = {
   login: (credentials) => apiClient.post('/api/users/login', credentials),
+  getMe: () => apiClient.get('/api/auth/me'),
 }
 
 

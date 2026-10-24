@@ -31,14 +31,14 @@ def run_all_services():
     gateway_url = "http://127.0.0.1:8000/health"
     ready = False
     start_time = time.time()
-    while time.time() - start_time < 15:
+    while time.time() - start_time < 20:
         try:
             with httpx.Client(timeout=1.0) as client:
                 res = client.get(gateway_url)
                 if res.status_code == 200:
                     data = res.json()
                     services_status = data.get("services", {})
-                    if all(v == "UP" for v in services_status.values()):
+                    if len(services_status) == 6 and all(v == "UP" for v in services_status.values()):
                         ready = True
                         break
         except Exception:
@@ -61,6 +61,17 @@ def run_all_services():
         if p.poll() is None:
             p.kill()
 
+
+@pytest.fixture(scope="module")
+def admin_headers(run_all_services):
+    gateway_url = run_all_services
+    with httpx.Client(base_url=gateway_url, timeout=5.0) as client:
+        res = client.post("/api/users/login", json={"email": "admin@gym.com", "password": "password123"})
+        assert res.status_code == 200
+        token = res.json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+
 def test_gateway_health(run_all_services):
     base_url = run_all_services
     with httpx.Client(base_url=base_url) as client:
@@ -72,9 +83,51 @@ def test_gateway_health(run_all_services):
         for name, status_val in data["services"].items():
             assert status_val == "UP"
 
-def test_legacy_frontend_compatibility(run_all_services):
+
+def test_unauthenticated_requests_rejected(run_all_services):
     base_url = run_all_services
     with httpx.Client(base_url=base_url) as client:
+        # Protected proxy routes must return 401 Unauthorized without token
+        assert client.get("/users").status_code == 401
+        assert client.get("/membership-plans").status_code == 401
+        assert client.get("/members").status_code == 401
+        assert client.get("/gym-classes").status_code == 401
+        assert client.get("/bookings").status_code == 401
+        assert client.get("/invoices").status_code == 401
+        assert client.get("/payments").status_code == 401
+        assert client.get("/attendance").status_code == 401
+
+        # Protected composite routes must return 401 Unauthorized without token
+        assert client.get("/api/composite/bookings").status_code == 401
+        assert client.get("/api/composite/invoices").status_code == 401
+        assert client.get("/api/composite/payments").status_code == 401
+        assert client.get("/api/composite/attendance").status_code == 401
+        assert client.get("/api/composite/classes").status_code == 401
+        assert client.get("/api/composite/members").status_code == 401
+        assert client.get("/api/composite/slots").status_code == 401
+
+
+def test_invalid_token_rejected(run_all_services):
+    base_url = run_all_services
+    with httpx.Client(base_url=base_url) as client:
+        bad_headers = {"Authorization": "Bearer invalid_gibberish_token_string"}
+        assert client.get("/users", headers=bad_headers).status_code == 401
+        assert client.get("/api/composite/classes", headers=bad_headers).status_code == 401
+
+
+def test_auth_me_endpoint(run_all_services, admin_headers):
+    base_url = run_all_services
+    with httpx.Client(base_url=base_url) as client:
+        res = client.get("/api/auth/me", headers=admin_headers)
+        assert res.status_code == 200
+        data = res.json()
+        assert data["email"] == "admin@gym.com"
+        assert data["role"] == "admin"
+
+
+def test_legacy_frontend_compatibility(run_all_services, admin_headers):
+    base_url = run_all_services
+    with httpx.Client(base_url=base_url, headers=admin_headers) as client:
         # Frontend calls routes with trailing slashes directly without /api/
         assert client.get("/users/").status_code == 200
         assert client.get("/membership-plans/").status_code == 200
@@ -86,9 +139,10 @@ def test_legacy_frontend_compatibility(run_all_services):
         assert client.get("/payments/").status_code == 200
         assert client.get("/attendance/").status_code == 200
 
-def test_standardized_api_routes(run_all_services):
+
+def test_standardized_api_routes(run_all_services, admin_headers):
     base_url = run_all_services
-    with httpx.Client(base_url=base_url) as client:
+    with httpx.Client(base_url=base_url, headers=admin_headers) as client:
         # Standardized endpoints under /api/...
         assert client.get("/api/users").status_code == 200
         assert client.get("/api/membership-plans").status_code == 200
@@ -100,9 +154,10 @@ def test_standardized_api_routes(run_all_services):
         assert client.get("/api/payments").status_code == 200
         assert client.get("/api/attendances").status_code == 200
 
-def test_crud_through_gateway(run_all_services):
+
+def test_crud_through_gateway(run_all_services, admin_headers):
     base_url = run_all_services
-    with httpx.Client(base_url=base_url) as client:
+    with httpx.Client(base_url=base_url, headers=admin_headers) as client:
         # Create a user via standardized route
         user_data = {
             "email": "e2e.test@gym.com",
@@ -135,9 +190,9 @@ def test_crud_through_gateway(run_all_services):
         assert res_del.status_code == 200
 
 
-def test_composite_aggregation_routes(run_all_services):
+def test_composite_aggregation_routes(run_all_services, admin_headers):
     base_url = run_all_services
-    with httpx.Client(base_url=base_url) as client:
+    with httpx.Client(base_url=base_url, headers=admin_headers) as client:
         # Check all 7 composite routes return 200 OK and populated objects
         r_bookings = client.get("/api/composite/bookings")
         assert r_bookings.status_code == 200
@@ -212,5 +267,3 @@ def test_auth_login_through_gateway(run_all_services):
         # Invalid login
         res_invalid = client.post("/api/users/login", json={"email": "admin@gym.com", "password": "wrong"})
         assert res_invalid.status_code == 401
-
-

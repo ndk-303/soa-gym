@@ -20,6 +20,9 @@ class GatewaySettings(BaseSettings):
     GATEWAY_HTTP_TIMEOUT: float = 10.0
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
 
+    JWT_SECRET_KEY: str = "gym_soa_jwt_secret_key_super_secure_32bytes_min"
+    JWT_ALGORITHM: str = "HS256"
+
     USER_SERVICE_URL: str = "http://127.0.0.1:8001"
     MEMBERSHIP_SERVICE_URL: str = "http://127.0.0.1:8002"
     CLASS_SERVICE_URL: str = "http://127.0.0.1:8003"

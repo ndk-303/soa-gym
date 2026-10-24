@@ -4,9 +4,11 @@ import asyncio
 import httpx
 from typing import Optional, Tuple, Any, List, Dict
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Response, HTTPException, status
+import jwt
+from fastapi import FastAPI, Request, Response, HTTPException, status, Depends, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
@@ -36,11 +38,14 @@ async def lifespan(app: FastAPI):
         await http_client.aclose()
 
 
+security_scheme = HTTPBearer(auto_error=False)
+
 app = FastAPI(
     title="Gym Management API Gateway (SOA)",
-    description="Unified Entry Point for Gym Management Microservices",
+    description="Unified Entry Point for Gym Management Microservices with Centralized JWT Authentication",
     version="1.0.0",
     lifespan=lifespan,
+    swagger_ui_parameters={"persistAuthorization": True},
 )
 
 app.add_middleware(
@@ -50,6 +55,88 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ==================== JWT Verification & Auth Helpers ====================
+
+def decode_jwt_token(token: str) -> dict:
+    try:
+        payload = jwt.decode(
+            token,
+            settings.JWT_SECRET_KEY,
+            algorithms=[settings.JWT_ALGORITHM],
+        )
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token xác thực không hợp lệ.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+async def verify_jwt_token(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security_scheme),
+) -> dict:
+    raw_token = None
+    if credentials and credentials.credentials:
+        raw_token = credentials.credentials
+    else:
+        auth_header = request.headers.get("authorization", "")
+        if auth_header:
+            parts = auth_header.split(" ", 1)
+            if len(parts) == 2 and parts[0].lower() == "bearer":
+                raw_token = parts[1].strip()
+            elif len(parts) == 1 and parts[0]:
+                raw_token = parts[0].strip()
+
+    if not raw_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Yêu cầu xác thực: Vui lòng cung cấp Bearer token trong header Authorization.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return decode_jwt_token(raw_token)
+
+
+def require_roles(allowed_roles: List[str]):
+    async def role_checker(current_user: dict = Depends(verify_jwt_token)):
+        user_role = current_user.get("role")
+        if user_role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Quyền truy cập bị từ chối: Vai trò '{user_role}' không được phép truy cập tài nguyên này.",
+            )
+        return current_user
+    return role_checker
+
+
+def is_public_path(method: str, target_path: str, clean_path: str) -> bool:
+    if method == "OPTIONS":
+        return True
+
+    clean = clean_path.strip("/")
+    if clean.startswith("api/"):
+        clean = clean[4:].strip("/")
+
+    if clean in ("", "health", "favicon.ico", "docs", "redoc", "openapi.json"):
+        return True
+
+    if clean.endswith("/health") or clean == "health":
+        return True
+
+    if method == "POST" and (target_path == "/users/login" or clean.endswith("/login") or clean == "login"):
+        return True
+
+    return False
 
 
 def match_service_url(path: str) -> Optional[Tuple[str, str]]:
@@ -127,6 +214,18 @@ async def health_check():
     }
 
 
+@app.get("/api/auth/me", tags=["Auth"])
+async def get_current_user_profile(current_user: dict = Depends(verify_jwt_token)):
+    """
+    Returns the currently authenticated user claims.
+    """
+    return {
+        "id": current_user.get("sub"),
+        "email": current_user.get("email"),
+        "role": current_user.get("role"),
+    }
+
+
 # ==================== Composite Aggregator Helpers & Endpoints ====================
 
 def get_proxy_client() -> Tuple[httpx.AsyncClient, bool]:
@@ -146,7 +245,7 @@ async def fetch_json(client: httpx.AsyncClient, url: str) -> Any:
 
 
 @app.get("/api/composite/bookings")
-async def composite_bookings():
+async def composite_bookings(current_user: dict = Depends(verify_jwt_token)):
     client, should_close = get_proxy_client()
     try:
         tasks = [
@@ -182,7 +281,7 @@ async def composite_bookings():
 
 
 @app.get("/api/composite/invoices")
-async def composite_invoices():
+async def composite_invoices(current_user: dict = Depends(verify_jwt_token)):
     client, should_close = get_proxy_client()
     try:
         tasks = [
@@ -207,7 +306,7 @@ async def composite_invoices():
 
 
 @app.get("/api/composite/payments")
-async def composite_payments():
+async def composite_payments(current_user: dict = Depends(verify_jwt_token)):
     client, should_close = get_proxy_client()
     try:
         tasks = [
@@ -242,7 +341,7 @@ async def composite_payments():
 
 
 @app.get("/api/composite/attendance")
-async def composite_attendance():
+async def composite_attendance(current_user: dict = Depends(verify_jwt_token)):
     client, should_close = get_proxy_client()
     try:
         tasks = [
@@ -267,7 +366,7 @@ async def composite_attendance():
 
 
 @app.get("/api/composite/classes")
-async def composite_classes():
+async def composite_classes(current_user: dict = Depends(verify_jwt_token)):
     client, should_close = get_proxy_client()
     try:
         tasks = [
@@ -292,7 +391,7 @@ async def composite_classes():
 
 
 @app.get("/api/composite/members")
-async def composite_members():
+async def composite_members(current_user: dict = Depends(verify_jwt_token)):
     client, should_close = get_proxy_client()
     try:
         tasks = [
@@ -320,7 +419,7 @@ async def composite_members():
 
 
 @app.get("/api/composite/slots")
-async def composite_slots():
+async def composite_slots(current_user: dict = Depends(verify_jwt_token)):
     client, should_close = get_proxy_client()
     try:
         tasks = [
@@ -344,8 +443,14 @@ async def composite_slots():
             await client.aclose()
 
 
+# ==================== Reverse Proxy with Auth Verification ====================
+
 @app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
-async def reverse_proxy(full_path: str, request: Request):
+async def reverse_proxy(
+    full_path: str,
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security_scheme),
+):
     # Ignore favicon and docs paths from proxying
     if full_path in ("favicon.ico", "docs", "redoc", "openapi.json"):
         raise HTTPException(status_code=404, detail="Not found")
@@ -360,6 +465,14 @@ async def reverse_proxy(full_path: str, request: Request):
     headers = {k: v for k, v in request.headers.items() if k.lower() not in ("host", "content-length")}
     params = dict(request.query_params)
     body = await request.body()
+
+    # Authentication verification check
+    if not is_public_path(request.method, target_path, full_path):
+        user_claims = await verify_jwt_token(request, credentials)
+        # Inject verified identity into downstream headers
+        headers["x-user-id"] = str(user_claims.get("sub", ""))
+        headers["x-user-email"] = str(user_claims.get("email", ""))
+        headers["x-user-role"] = str(user_claims.get("role", ""))
 
     client = http_client if http_client is not None else httpx.AsyncClient(timeout=10.0)
     should_close = http_client is None
