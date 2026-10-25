@@ -451,6 +451,12 @@
   white-space: nowrap;
 }
 
+.semantic-badge.is-primary {
+  border-color: var(--color-primary-border);
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
 .semantic-badge.is-success {
   border-color: var(--color-success-border);
   color: var(--color-success);
@@ -823,7 +829,7 @@
   background-color: var(--color-border-subtle);
 }
 
-/* Danger Button Style */
+/* Danger Button Style - Aligned with Design Tokens */
 .management-danger-button {
   display: inline-flex;
   align-items: center;
@@ -831,20 +837,20 @@
   min-height: 36px;
   padding: 6px 14px;
   border-radius: var(--radius-sm);
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
-  border: 1px solid var(--color-danger, #ef4444);
-  color: #fff;
-  background: var(--color-danger, #ef4444);
-  box-shadow: 0 1px 2px rgba(239, 68, 68, 0.2);
+  border: 1px solid var(--color-danger);
+  color: #ffffff;
+  background: var(--color-danger);
+  box-shadow: 0 1px 2px rgba(185, 28, 28, 0.2);
 }
 
 .management-danger-button:hover:not(:disabled) {
-  background: #dc2626;
-  border-color: #dc2626;
-  color: #fff;
+  background: #991b1b;
+  border-color: #991b1b;
+  color: #ffffff;
 }
 
 .management-danger-button:disabled {
@@ -852,50 +858,35 @@
   cursor: not-allowed;
 }
 
-/* Active Check-in Session Banner on Member Dashboard */
-.checkin-session-banner {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.09) 0%, rgba(5, 150, 105, 0.04) 100%);
-  border: 1px solid rgba(16, 185, 129, 0.32);
-  border-radius: var(--radius-md, 10px);
-  padding: 16px 20px;
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
+/* Modal Summary Info Card */
+.modal-info-summary {
+  background: var(--color-border-subtle, #f8fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 16px;
 }
 
-.checkin-pulse-wrapper {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
+.modal-info-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  display: block;
+  margin-bottom: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
 }
 
-.checkin-pulse-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background-color: #10b981;
-  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-  animation: checkin-pulse 1.8s infinite;
-  display: inline-block;
+.modal-info-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
-@keyframes checkin-pulse {
-  0% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-  }
-  70% {
-    transform: scale(1.05);
-    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
-  }
-  100% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
-  }
+.modal-info-value.is-primary {
+  color: var(--color-primary);
+}
+
+.modal-info-value.is-success {
+  color: var(--color-success);
 }

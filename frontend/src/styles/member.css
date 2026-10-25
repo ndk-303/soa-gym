@@ -287,3 +287,126 @@
   background: var(--color-primary-subtle);
 }
 
+/* Active Workout Session Banner - Synchronized with Blue Member Portal Theme */
+.member-active-session-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border: 1px solid var(--color-primary-border);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-subtle);
+  color: var(--text-primary);
+  margin-bottom: 24px;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.15s ease;
+}
+
+.member-active-session-banner:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.member-active-session-icon {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  border: 1px solid var(--color-primary-border);
+  color: var(--color-primary);
+  font-size: 18px;
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.member-active-pulse-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--color-primary);
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.6);
+  animation: member-pulse 1.8s infinite;
+}
+
+@keyframes member-pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.6);
+  }
+  70% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 6px rgba(37, 99, 235, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+  }
+}
+
+/* Refined Check-out action button matching dashboard secondary buttons with danger accent */
+.member-checkout-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid var(--color-danger-border);
+  background: var(--surface);
+  color: var(--color-danger);
+  box-shadow: var(--shadow-sm);
+}
+
+.member-checkout-button:hover:not(:disabled) {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(185, 28, 28, 0.2);
+}
+
+.member-checkout-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Fallback for checkin-session-banner */
+.checkin-session-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border: 1px solid var(--color-primary-border);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-subtle);
+  color: var(--text-primary);
+  margin-bottom: 24px;
+  box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 768px) {
+  .member-active-session-banner,
+  .checkin-session-banner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+  .member-active-session-banner button,
+  .checkin-session-banner button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+

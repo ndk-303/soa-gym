@@ -269,29 +269,28 @@ export default function MemberDashboard({ onTabChange, currentMember, memberLoad
         </div>
       )}
 
-      {/* Active Session Status Banner */}
+      {/* Active Session Status Banner - Harmonized with Dashboard Design System */}
       {activeSession && (
-        <div className="checkin-session-banner">
-          <div className="d-flex align-items-center gap-3">
-            <div className="checkin-pulse-wrapper">
-              <span className="checkin-pulse-dot"></span>
-            </div>
+        <div className="member-active-session-banner">
+          <div className="member-banner-content">
+            <span className="member-active-session-icon">
+              <i className="bi bi-person-walking"></i>
+              <span className="member-active-pulse-dot" title="Đang trong phòng tập"></span>
+            </span>
             <div>
-              <div className="d-flex align-items-center gap-2 flex-wrap">
-                <strong style={{ color: '#059669', fontSize: '15px' }}>
-                  Bạn đang trong phiên tập luyện tại phòng gym
-                </strong>
-                <span className="badge bg-success-subtle text-success border border-success-subtle py-1 px-2">
-                  Đang hoạt động
-                </span>
+              <div className="member-banner-title d-flex align-items-center gap-2 flex-wrap">
+                <span>Bạn đang trong phiên tập luyện</span>
+                <span className="semantic-badge is-primary">Đang hoạt động</span>
               </div>
-              <div className="text-secondary small mt-1">
-                <i className="bi bi-clock me-1"></i>
-                Giờ check-in: <strong>{activeSession.check_in_time}</strong>
+              <div className="member-banner-text d-flex align-items-center gap-3 flex-wrap">
+                <span>
+                  <i className="bi bi-clock me-1 text-primary"></i>
+                  Giờ check-in: <strong>{activeSession.check_in_time}</strong>
+                </span>
                 {activeSession.notes && (
-                  <span className="ms-3 text-muted">
-                    <i className="bi bi-chat-left-text me-1"></i>
-                    Ghi chú: {activeSession.notes}
+                  <span>
+                    <i className="bi bi-chat-left-text me-1 text-muted"></i>
+                    Ghi chú: <span className="fw-medium text-dark">{activeSession.notes}</span>
                   </span>
                 )}
               </div>
@@ -300,7 +299,7 @@ export default function MemberDashboard({ onTabChange, currentMember, memberLoad
           <div>
             <button
               type="button"
-              className="management-danger-button"
+              className="member-checkout-button"
               onClick={handleOpenCheckOut}
               disabled={loading || memberLoading}
               title="Kết thúc ca tập và check-out khỏi phòng tập"
@@ -436,31 +435,25 @@ export default function MemberDashboard({ onTabChange, currentMember, memberLoad
             )}
 
             {/* Member & Plan Info Summary */}
-            <div
-              className="p-3 mb-3 rounded-3"
-              style={{
-                background: 'var(--surface-hover, #f8fafc)',
-                border: '1px solid var(--border-color, #e2e8f0)',
-              }}
-            >
-              <div className="row g-2">
+            <div className="modal-info-summary">
+              <div className="row g-3">
                 <div className="col-6">
-                  <span className="text-muted small">Hội viên:</span>
-                  <div className="fw-semibold">{currentMember?.full_name}</div>
+                  <span className="modal-info-label">Hội viên</span>
+                  <div className="modal-info-value">{currentMember?.full_name}</div>
                 </div>
                 <div className="col-6">
-                  <span className="text-muted small">Gói tập:</span>
-                  <div className="fw-semibold text-primary">{currentPlan?.name}</div>
+                  <span className="modal-info-label">Gói tập</span>
+                  <div className="modal-info-value is-primary">{currentPlan?.name}</div>
                 </div>
                 <div className="col-6">
-                  <span className="text-muted small">Trạng thái:</span>
+                  <span className="modal-info-label">Trạng thái</span>
                   <div>
                     <StatusBadge status={currentMember?.status || 'active'} />
                   </div>
                 </div>
                 <div className="col-6">
-                  <span className="text-muted small">Thời hạn còn lại:</span>
-                  <div className="fw-semibold text-success">{planTimeline.remainingDays} ngày</div>
+                  <span className="modal-info-label">Thời hạn còn lại</span>
+                  <div className="modal-info-value is-primary">{planTimeline.remainingDays} ngày</div>
                 </div>
               </div>
             </div>
@@ -539,21 +532,20 @@ export default function MemberDashboard({ onTabChange, currentMember, memberLoad
             </div>
           )}
 
-          <div
-            className="p-3 mb-3 rounded-3"
-            style={{
-              background: 'var(--surface-hover, #f8fafc)',
-              border: '1px solid var(--border-color, #e2e8f0)',
-            }}
-          >
+          <div className="modal-info-summary">
             <div className="mb-2">
-              <span className="text-muted small">Thời gian bắt đầu check-in:</span>
-              <div className="fw-semibold text-primary">{activeSession?.check_in_time}</div>
+              <span className="modal-info-label">Thời gian bắt đầu check-in</span>
+              <div className="modal-info-value is-primary">
+                <i className="bi bi-clock me-1"></i>
+                {activeSession?.check_in_time}
+              </div>
             </div>
             {activeSession?.notes && (
               <div>
-                <span className="text-muted small">Ghi chú đã lưu:</span>
-                <div>{activeSession.notes}</div>
+                <span className="modal-info-label">Ghi chú đã lưu</span>
+                <div className="modal-info-value text-secondary fw-normal">
+                  {activeSession.notes}
+                </div>
               </div>
             )}
           </div>
