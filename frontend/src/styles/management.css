@@ -323,14 +323,31 @@
   padding-right: 20px;
 }
 
-.management-table thead th.is-left { text-align: left; }
+.management-table thead th.is-left {
+  text-align: left;
+}
+
 .management-table thead th.is-center,
-.management-table thead th.actions-col { text-align: center; }
-.management-table thead th.is-right { text-align: right; }
-.management-table tbody td.text-end { text-align: right !important; }
+.management-table thead th.actions-col {
+  text-align: center;
+}
+
+.management-table thead th.is-right {
+  text-align: right;
+}
+
+.management-table tbody td.text-end {
+  text-align: right !important;
+}
+
 .management-table tbody td.text-center,
-.management-table tbody td.actions-cell { text-align: center !important; }
-.management-table tbody td:has(.row-actions) { text-align: center !important; }
+.management-table tbody td.actions-cell {
+  text-align: center !important;
+}
+
+.management-table tbody td:has(.row-actions) {
+  text-align: center !important;
+}
 
 .management-table tbody tr:last-child td {
   border-bottom: 0;
@@ -562,7 +579,7 @@
   justify-content: center;
 }
 
-.management-empty > i,
+.management-empty>i,
 .management-empty-icon {
   display: inline-block;
   margin-bottom: 12px;
@@ -661,37 +678,46 @@
     flex-direction: column;
     gap: 16px;
   }
+
   .management-header-actions {
     width: 100%;
   }
-  .management-header-actions > * {
+
+  .management-header-actions>* {
     flex: 1;
     justify-content: center;
   }
+
   .management-header h1 {
     font-size: 26px;
   }
+
   .management-filter-bar {
     flex-direction: column;
     align-items: stretch;
     gap: 12px;
   }
+
   .management-filter-inputs {
     flex-direction: column;
     align-items: stretch;
   }
+
   .management-search-wrapper,
   .management-select-wrapper {
     max-width: 100%;
     width: 100%;
   }
+
   .management-filter-summary {
     justify-content: space-between;
   }
+
   .row-actions {
     flex-direction: column;
     align-items: stretch;
   }
+
   .row-action-button {
     justify-content: center;
   }
@@ -730,6 +756,7 @@
     opacity: 0;
     transform: translateY(8px) scale(0.98);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -787,6 +814,7 @@
 /* Micro-interactions */
 .management-primary-button:active,
 .management-secondary-button:active,
+.management-danger-button:active,
 .btn-save:active {
   transform: translateY(1px);
 }
@@ -795,3 +823,79 @@
   background-color: var(--color-border-subtle);
 }
 
+/* Danger Button Style */
+.management-danger-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid var(--color-danger, #ef4444);
+  color: #fff;
+  background: var(--color-danger, #ef4444);
+  box-shadow: 0 1px 2px rgba(239, 68, 68, 0.2);
+}
+
+.management-danger-button:hover:not(:disabled) {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+
+.management-danger-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Active Check-in Session Banner on Member Dashboard */
+.checkin-session-banner {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.09) 0%, rgba(5, 150, 105, 0.04) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.32);
+  border-radius: var(--radius-md, 10px);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.checkin-pulse-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.checkin-pulse-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: #10b981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: checkin-pulse 1.8s infinite;
+  display: inline-block;
+}
+
+@keyframes checkin-pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}

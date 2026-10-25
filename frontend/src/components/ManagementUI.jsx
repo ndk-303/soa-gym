@@ -140,44 +140,65 @@ export function ManagementModal({
   isOpen,
   onClose,
   title,
-  titleId = 'management-modal-title',
+  titleId: propTitleId,
   children,
   dialogClassName = 'modal-dialog-centered',
   isSubmitting = false,
 }) {
   const modalContentRef = useRef(null)
+  const autoTitleId = useRef(`modal-title-${Math.random().toString(36).substring(2, 9)}`).current
+  const titleId = propTitleId || autoTitleId
+  const hasFocusedRef = useRef(false)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) {
+      hasFocusedRef.current = false
+      return
+    }
 
     // Lock background scrolling
     const originalOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
 
-    // Auto focus first interactive element in modal
-    const timer = setTimeout(() => {
-      if (modalContentRef.current) {
-        const focusable = modalContentRef.current.querySelector(
-          'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button.btn-close'
-        )
+    // Auto focus first interactive form control only once when modal opens
+    let timer = null
+    if (!hasFocusedRef.current) {
+      hasFocusedRef.current = true
+      timer = setTimeout(() => {
+        if (!modalContentRef.current) return
+        // If an element inside modal is already focused, do not move focus
+        if (
+          document.activeElement &&
+          modalContentRef.current.contains(document.activeElement) &&
+          ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)
+        ) {
+          return
+        }
+        const focusable =
+          modalContentRef.current.querySelector(
+            '.modal-body input:not([disabled]):not([type="hidden"]), .modal-body textarea:not([disabled]), .modal-body select:not([disabled]), input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled])'
+          ) ||
+          modalContentRef.current.querySelector('button.btn-close, button:not([disabled])')
         focusable?.focus()
-      }
-    }, 60)
+      }, 80)
+    }
 
     // Keydown handler for Escape key
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' && !isSubmitting) {
-        onClose?.()
+        onCloseRef.current?.()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => {
-      clearTimeout(timer)
+      if (timer) clearTimeout(timer)
       document.body.style.overflow = originalOverflow
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isOpen, isSubmitting, onClose])
+  }, [isOpen, isSubmitting])
 
   if (!isOpen) return null
 
