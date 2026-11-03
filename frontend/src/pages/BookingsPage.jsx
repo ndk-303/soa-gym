@@ -152,6 +152,16 @@ export default function BookingsPage() {
   const slotMap = useMemo(() => Object.fromEntries(slots.map((s) => [s.id, s])), [slots])
   const classMap = useMemo(() => Object.fromEntries(classes.map((c) => [c.id, c])), [classes])
 
+  const bookingCountBySlot = useMemo(() => {
+    return bookings.reduce((counts, b) => {
+      if (b.status !== 'cancelled') {
+        const sid = Number(b.slot_id)
+        counts[sid] = (counts[sid] || 0) + 1
+      }
+      return counts
+    }, {})
+  }, [bookings])
+
   const statusOptions = [
     { value: 'all', label: 'Tất cả trạng thái' },
     { value: 'confirmed', label: 'Đã xác nhận' },
@@ -309,9 +319,10 @@ export default function BookingsPage() {
                 <option value="">-- Chọn ca tập --</option>
                 {slots.map((s) => {
                   const linkedClass = classMap[s.class_id]
+                  const currentBookings = bookingCountBySlot[s.id] ?? s.current_bookings ?? 0
                   return (
                     <option key={s.id} value={s.id}>
-                      {s.start_time} - {linkedClass ? linkedClass.name : `Lớp #${s.class_id}`} (Đã đặt {s.current_bookings}/{s.max_capacity})
+                      {s.start_time} - {linkedClass ? linkedClass.name : `Lớp #${s.class_id}`} (Đã đặt {currentBookings}/{s.max_capacity})
                     </option>
                   )
                 })}
