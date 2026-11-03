@@ -15,12 +15,13 @@ export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState('all')
 
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, id: null, loading: false })
-  
+
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [formData, setFormData] = useState({
     email: '',
-    role: 'member',
+    full_name: '',
+    role: 'user',
     password: '',
     is_active: true,
   })
@@ -48,7 +49,8 @@ export default function UsersPage() {
     setEditingId(null)
     setFormData({
       email: '',
-      role: 'member',
+      full_name: '',
+      role: 'user',
       password: '',
       is_active: true,
     })
@@ -60,6 +62,7 @@ export default function UsersPage() {
     setEditingId(user.id)
     setFormData({
       email: user.email,
+      full_name: user.full_name || '',
       role: user.role,
       password: '',
       is_active: user.is_active,
@@ -80,8 +83,16 @@ export default function UsersPage() {
     setFormError(null)
 
     const cleanEmail = formData.email?.trim() || ''
+    const cleanFullName = formData.full_name?.trim() || ''
+
     if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
       setFormError('Vui lòng nhập địa chỉ email hợp lệ (ví dụ: hoivien@gym.com)')
+      setSubmitting(false)
+      return
+    }
+
+    if (!cleanFullName) {
+      setFormError('Vui lòng nhập họ và tên của người dùng')
       setSubmitting(false)
       return
     }
@@ -96,6 +107,7 @@ export default function UsersPage() {
       if (editingId) {
         const payload = {
           email: cleanEmail,
+          full_name: cleanFullName,
           role: formData.role,
           is_active: formData.is_active,
         }
@@ -108,6 +120,7 @@ export default function UsersPage() {
         await usersApi.create({
           ...formData,
           email: cleanEmail,
+          full_name: cleanFullName,
         })
         toast.success('Tạo mới tài khoản thành công')
       }
@@ -140,13 +153,19 @@ export default function UsersPage() {
     }
   }
 
-  const roleLabels = { admin: 'Quản trị viên', trainer: 'Huấn luyện viên', member: 'Hội viên' }
+  const roleLabels = {
+    admin: 'Quản trị viên',
+    trainer: 'Huấn luyện viên',
+    member: 'Hội viên',
+    user: 'Người dùng',
+  }
 
   const roleOptions = [
     { value: 'all', label: 'Tất cả vai trò' },
-    { value: 'admin', label: 'Quản trị viên' },
-    { value: 'trainer', label: 'Huấn luyện viên' },
+    { value: 'user', label: 'Người dùng' },
     { value: 'member', label: 'Hội viên' },
+    { value: 'trainer', label: 'Huấn luyện viên' },
+    { value: 'admin', label: 'Quản trị viên' },
   ]
 
   const filteredUsers = useMemo(() => {
@@ -154,6 +173,7 @@ export default function UsersPage() {
       const q = searchTerm.trim().toLowerCase()
       const matchSearch =
         !q ||
+        (u.full_name && u.full_name.toLowerCase().includes(q)) ||
         (u.email && u.email.toLowerCase().includes(q)) ||
         String(u.id).includes(q)
       const matchRole = roleFilter === 'all' || u.role === roleFilter
@@ -184,7 +204,7 @@ export default function UsersPage() {
       <ManagementFilterBar
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
-        searchPlaceholder="Tìm theo email hoặc ID tài khoản..."
+        searchPlaceholder="Tìm theo tên, email hoặc ID tài khoản..."
         filterValue={roleFilter}
         onFilterChange={setRoleFilter}
         filterOptions={roleOptions}
@@ -195,12 +215,13 @@ export default function UsersPage() {
       />
 
       <ManagementTable
-        minWidth={660}
+        minWidth={720}
         columns={[
-          { key: 'email', label: 'Email', width: '36%' },
-          { key: 'role', label: 'Vai trò', width: '24%' },
-          { key: 'status', label: 'Trạng thái', width: '20%' },
-          { key: 'actions', label: 'Hành động', width: '20%', align: 'center' },
+          { key: 'name', label: 'Họ và tên', width: '28%' },
+          { key: 'email', label: 'Email tài khoản', width: '28%' },
+          { key: 'role', label: 'Vai trò', width: '18%' },
+          { key: 'status', label: 'Trạng thái', width: '14%' },
+          { key: 'actions', label: 'Hành động', width: '12%', align: 'center' },
         ]}
         loading={loading}
         loadingMessage="Đang tải dữ liệu Users từ API..."
@@ -221,7 +242,13 @@ export default function UsersPage() {
       >
         {filteredUsers.map((u) => (
           <tr key={u.id}>
-            <td><div className="primary-cell">{u.email}</div><div className="secondary-cell">Tài khoản #{u.id}</div></td>
+            <td>
+              <div className="primary-cell">{u.full_name || 'Chưa đặt tên'}</div>
+              <div className="secondary-cell">ID #{u.id}</div>
+            </td>
+            <td>
+              <div className="linked-value"><i className="bi bi-envelope"></i>{u.email}</div>
+            </td>
             <td>
               <span className="semantic-badge">{roleLabels[u.role] || u.role}</span>
             </td>
@@ -250,7 +277,19 @@ export default function UsersPage() {
               </div>
             )}
             <div className="mb-3">
-              <label htmlFor="user-email" className="form-label small fw-bold">Email</label>
+              <label htmlFor="user-fullname" className="form-label small fw-bold">Họ và tên</label>
+              <input
+                id="user-fullname"
+                type="text"
+                className="form-control"
+                value={formData.full_name}
+                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                required
+                placeholder="Ví dụ: Nguyễn Văn An"
+              />
+            </div>
+            <div className="mb-3">
+              <label htmlFor="user-email" className="form-label small fw-bold">Email đăng nhập</label>
               <input
                 id="user-email"
                 type="email"
@@ -258,6 +297,7 @@ export default function UsersPage() {
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 required
+                placeholder="name@gym.com"
               />
             </div>
             <div className="mb-3">
@@ -282,6 +322,7 @@ export default function UsersPage() {
                 value={formData.role}
                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
               >
+                <option value="user">Người dùng (User)</option>
                 <option value="member">Hội viên (Member)</option>
                 <option value="trainer">Huấn luyện viên (Trainer)</option>
                 <option value="admin">Quản trị viên (Admin)</option>

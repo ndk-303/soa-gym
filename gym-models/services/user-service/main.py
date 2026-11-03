@@ -16,7 +16,7 @@ import jwt
 from pwdlib import PasswordHash
 import models
 from models import User
-from schemas import User_Request, Login_Request
+from schemas import User_Request, Login_Request, User_Role_Update
 from database import engine, SessionLocal, get_db
 from config import settings
 
@@ -35,9 +35,18 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     except Exception:
         return plain_password == hashed_password
 
+def create_access_token(user: User) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
+    payload = {
+        "sub": str(user.id),
+        "email": user.email,
+        "full_name": user.full_name or "",
+        "role": user.role,
+        "exp": expire,
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
 app = FastAPI(title="User Service - Gym SOA", version="1.0.0")
-
-
 
 app.add_middleware(
     CORSMiddleware,
@@ -59,9 +68,9 @@ def startup_populate_data():
         users = db.query(User).all()
         if len(users) == 0:
             db.add_all([
-                User(email="admin@gym.com", role="admin", password=hash_password("password123"), is_active=True),
-                User(email="trainer.nam@gym.com", role="trainer", password=hash_password("password123"), is_active=True),
-                User(email="member.an@gym.com", role="member", password=hash_password("password123"), is_active=True),
+                User(email="admin@gym.com", full_name="Admin Quản Trị", role="admin", password=hash_password("password123"), is_active=True),
+                User(email="trainer.nam@gym.com", full_name="HLV Nguyễn Văn Nam", role="trainer", password=hash_password("password123"), is_active=True),
+                User(email="member.an@gym.com", full_name="Nguyễn Văn An", role="member", password=hash_password("password123"), is_active=True),
             ])
             db.commit()
         else:
@@ -94,20 +103,14 @@ async def login(login_req: Login_Request, db: db_dependency):
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is deactivated")
 
-    expire = datetime.now(timezone.utc) + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
-    payload = {
-        "sub": str(user.id),
-        "email": user.email,
-        "role": user.role,
-        "exp": expire,
-    }
-    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    token = create_access_token(user)
     return {
         "access_token": token,
         "token_type": "bearer",
         "user": {
             "id": user.id,
             "email": user.email,
+            "full_name": user.full_name or "",
             "role": user.role,
             "is_active": user.is_active,
         }
@@ -124,8 +127,15 @@ async def get_user(db: db_dependency, id: int):
 
 @app.post("/users", status_code=status.HTTP_201_CREATED)
 async def create_user(db: db_dependency, user_request: User_Request):
+    if not user_request.password or len(user_request.password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 6 characters long."
+        )
     user_data = user_request.dict()
     user_data["password"] = hash_password(user_data["password"])
+    if not user_data.get("full_name"):
+        user_data["full_name"] = user_data["email"].split("@")[0]
     user_model = User(**user_data)
     db.add(user_model)
     db.commit()
@@ -138,19 +148,58 @@ async def update_user(db: db_dependency, id: int, user_request: User_Request):
     user = db.query(User).filter(User.id == id).first()
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    user.email = user_request.email
-    user.role = user_request.role
-    if user_request.password:
+    if user_request.email:
+        user.email = user_request.email
+    if user_request.full_name is not None:
+        user.full_name = user_request.full_name
+    if user_request.role:
+        user.role = user_request.role
+    if user_request.password and user_request.password.strip():
         if not user_request.password.startswith("$argon2"):
             user.password = hash_password(user_request.password)
         else:
             user.password = user_request.password
-    user.is_active = user_request.is_active
+    if user_request.is_active is not None:
+        user.is_active = user_request.is_active
     db.add(user)
     db.commit()
     db.refresh(user)
     return user
 
+
+@app.patch("/users/{id}/role")
+async def update_user_role(db: db_dependency, id: int, role_update: User_Role_Update):
+    user = db.query(User).filter(User.id == id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    valid_roles = ["admin", "trainer", "member", "user"]
+    if role_update.role not in valid_roles:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid role '{role_update.role}'. Allowed roles: {valid_roles}",
+        )
+
+    user.role = role_update.role
+    if role_update.full_name is not None and role_update.full_name.strip():
+        user.full_name = role_update.full_name.strip()
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    new_token = create_access_token(user)
+    return {
+        "message": "User role updated successfully",
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "full_name": user.full_name or "",
+            "role": user.role,
+            "is_active": user.is_active,
+        },
+        "access_token": new_token,
+        "token_type": "bearer",
+    }
 
 
 @app.delete("/users/{id}")

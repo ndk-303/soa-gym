@@ -217,11 +217,29 @@ async def health_check():
 @app.get("/api/auth/me", tags=["Auth"])
 async def get_current_user_profile(current_user: dict = Depends(verify_jwt_token)):
     """
-    Returns the currently authenticated user claims.
+    Returns the currently authenticated user claims, synchronized with latest database profile.
     """
+    user_id = current_user.get("sub")
+    client, should_close = get_proxy_client()
+    try:
+        if user_id:
+            user_data = await fetch_json(client, f"{USER_SERVICE_URL}/users/{user_id}")
+            if user_data and isinstance(user_data, dict):
+                return {
+                    "id": user_data.get("id"),
+                    "email": user_data.get("email"),
+                    "full_name": user_data.get("full_name") or "",
+                    "role": user_data.get("role"),
+                    "is_active": user_data.get("is_active"),
+                }
+    finally:
+        if should_close:
+            await client.aclose()
+
     return {
         "id": current_user.get("sub"),
         "email": current_user.get("email"),
+        "full_name": current_user.get("full_name") or "",
         "role": current_user.get("role"),
     }
 

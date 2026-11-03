@@ -39,6 +39,31 @@ export function AuthProvider({ children }) {
     setUser(null)
   }
 
+  const updateUserSession = (updatedUser, newToken) => {
+    if (updatedUser) {
+      setUser((prev) => {
+        const merged = { ...prev, ...updatedUser }
+        localStorage.setItem('gym_user', JSON.stringify(merged))
+        return merged
+      })
+    }
+    if (newToken) {
+      localStorage.setItem('gym_token', newToken)
+      setToken(newToken)
+    }
+  }
+
+  const refreshProfile = async () => {
+    try {
+      const res = await authApi.getMe()
+      if (res.data) {
+        updateUserSession(res.data)
+      }
+    } catch (err) {
+      console.warn('Failed to refresh user profile:', err)
+    }
+  }
+
   const isAuthenticated = Boolean(token && user)
   const isAdmin = user?.role === 'admin'
   const isTrainer = user?.role === 'trainer'
@@ -56,6 +81,8 @@ export function AuthProvider({ children }) {
         isMember,
         login,
         logout,
+        updateUserSession,
+        refreshProfile,
       }}
     >
       {children}

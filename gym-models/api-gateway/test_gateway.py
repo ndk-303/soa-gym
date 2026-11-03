@@ -4,14 +4,21 @@ import pytest
 from fastapi.testclient import TestClient
 import httpx
 from unittest.mock import AsyncMock, patch
+import jwt
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
 from main import app, match_service_url
+from config import settings
 
 client = TestClient(app)
+
+def get_auth_headers(role="admin"):
+    payload = {"sub": "1", "email": "admin@gym.com", "role": role}
+    token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return {"Authorization": f"Bearer {token}"}
 
 def test_route_matching():
     # Verify standard routes match correctly
@@ -52,7 +59,7 @@ def test_route_matching():
 def test_unreachable_service_returns_503():
     # If a service is offline, proxy should return 503
     with patch("httpx.AsyncClient.request", side_effect=httpx.ConnectError("Connection refused")):
-        response = client.get("/api/users")
+        response = client.get("/api/users", headers=get_auth_headers())
         assert response.status_code == 503
         assert "unavailable" in response.json()["detail"].lower()
 
@@ -75,7 +82,7 @@ def test_composite_bookings_endpoint():
         return None
 
     with patch("main.fetch_json", side_effect=mock_fetch_json):
-        res = client.get("/api/composite/bookings")
+        res = client.get("/api/composite/bookings", headers=get_auth_headers())
         assert res.status_code == 200
         data = res.json()
         assert len(data) == 1
@@ -97,7 +104,7 @@ def test_composite_invoices_endpoint():
         return None
 
     with patch("main.fetch_json", side_effect=mock_fetch_json):
-        res = client.get("/api/composite/invoices")
+        res = client.get("/api/composite/invoices", headers=get_auth_headers())
         assert res.status_code == 200
         data = res.json()
         assert len(data) == 1
@@ -120,7 +127,7 @@ def test_composite_payments_endpoint():
         return None
 
     with patch("main.fetch_json", side_effect=mock_fetch_json):
-        res = client.get("/api/composite/payments")
+        res = client.get("/api/composite/payments", headers=get_auth_headers())
         assert res.status_code == 200
         data = res.json()
         assert len(data) == 1
@@ -141,7 +148,7 @@ def test_composite_attendance_endpoint():
         return None
 
     with patch("main.fetch_json", side_effect=mock_fetch_json):
-        res = client.get("/api/composite/attendance")
+        res = client.get("/api/composite/attendance", headers=get_auth_headers())
         assert res.status_code == 200
         data = res.json()
         assert len(data) == 1
@@ -161,7 +168,7 @@ def test_composite_classes_endpoint():
         return None
 
     with patch("main.fetch_json", side_effect=mock_fetch_json):
-        res = client.get("/api/composite/classes")
+        res = client.get("/api/composite/classes", headers=get_auth_headers())
         assert res.status_code == 200
         data = res.json()
         assert len(data) == 1
@@ -184,7 +191,7 @@ def test_composite_members_endpoint():
         return None
 
     with patch("main.fetch_json", side_effect=mock_fetch_json):
-        res = client.get("/api/composite/members")
+        res = client.get("/api/composite/members", headers=get_auth_headers())
         assert res.status_code == 200
         data = res.json()
         assert len(data) == 1
@@ -204,9 +211,8 @@ def test_composite_slots_endpoint():
         return None
 
     with patch("main.fetch_json", side_effect=mock_fetch_json):
-        res = client.get("/api/composite/slots")
+        res = client.get("/api/composite/slots", headers=get_auth_headers())
         assert res.status_code == 200
         data = res.json()
         assert len(data) == 1
         assert data[0]["class"]["name"] == "Boxing Doi Khang"
-

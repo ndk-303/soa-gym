@@ -23,9 +23,10 @@ def test_startup_seeds_users(client):
     assert "member.an@gym.com" in emails
 
 def test_user_crud_flow(client):
-    # 1. Create a new user
+    # 1. Create a new user with full_name
     new_user = {
         "email": "test.user@gym.com",
+        "full_name": "Test User Name",
         "role": "member",
         "password": "secretpassword",
         "is_active": True
@@ -35,15 +36,18 @@ def test_user_crud_flow(client):
     created = create_res.json()
     user_id = created["id"]
     assert created["email"] == new_user["email"]
+    assert created["full_name"] == "Test User Name"
 
     # 2. Get user by ID
     get_res = client.get(f"/users/{user_id}")
     assert get_res.status_code == 200
     assert get_res.json()["email"] == new_user["email"]
+    assert get_res.json()["full_name"] == "Test User Name"
 
-    # 3. Update user
+    # 3. Update user full_name and other fields
     update_data = {
         "email": "updated.user@gym.com",
+        "full_name": "Updated User Name",
         "role": "trainer",
         "password": "newpassword123",
         "is_active": False
@@ -51,6 +55,7 @@ def test_user_crud_flow(client):
     update_res = client.put(f"/users/{user_id}", json=update_data)
     assert update_res.status_code == 200
     assert update_res.json()["email"] == "updated.user@gym.com"
+    assert update_res.json()["full_name"] == "Updated User Name"
     assert update_res.json()["is_active"] is False
 
     # 4. Delete user
@@ -70,6 +75,7 @@ def test_user_login_success(client):
     assert data["token_type"] == "bearer"
     assert data["user"]["email"] == "admin@gym.com"
     assert data["user"]["role"] == "admin"
+    assert "full_name" in data["user"]
 
     # Member login
     member_res = client.post("/users/login", json={"email": "member.an@gym.com", "password": "password123"})
@@ -78,6 +84,7 @@ def test_user_login_success(client):
     assert "access_token" in m_data
     assert m_data["user"]["email"] == "member.an@gym.com"
     assert m_data["user"]["role"] == "member"
+    assert "full_name" in m_data["user"]
 
 def test_user_login_invalid_credentials(client):
     # Wrong password
@@ -94,6 +101,7 @@ def test_password_hashing_and_verification(client):
     unique_email = f"hashed.{uuid.uuid4().hex[:8]}@gym.com"
     new_user = {
         "email": unique_email,
+        "full_name": "Hashed User",
         "role": "member",
         "password": "mysecretpassword",
         "is_active": True
@@ -117,4 +125,76 @@ def test_password_hashing_and_verification(client):
     client.delete(f"/users/{user_id}")
 
 
+def test_upgrade_user_role_from_user_to_member(client):
+    import uuid
+    import jwt
+    from config import settings
 
+    unique_email = f"user.{uuid.uuid4().hex[:8]}@gym.com"
+    new_user = {
+        "email": unique_email,
+        "full_name": "New User Person",
+        "role": "user",
+        "password": "userpass123",
+        "is_active": True
+    }
+    create_res = client.post("/users", json=new_user)
+    assert create_res.status_code == 201
+    user_id = create_res.json()["id"]
+    assert create_res.json()["role"] == "user"
+    assert create_res.json()["full_name"] == "New User Person"
+
+    # User registers membership plan -> role should be upgraded to 'member'
+    patch_res = client.patch(f"/users/{user_id}/role", json={"role": "member", "full_name": "Upgraded Member Person"})
+    assert patch_res.status_code == 200
+    res_data = patch_res.json()
+    assert res_data["user"]["role"] == "member"
+    assert res_data["user"]["full_name"] == "Upgraded Member Person"
+    assert "access_token" in res_data
+
+    # Token payload should have role 'member' and full_name
+    decoded = jwt.decode(res_data["access_token"], settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+    assert decoded["role"] == "member"
+    assert decoded["full_name"] == "Upgraded Member Person"
+
+    # Verify persisted in database
+    get_res = client.get(f"/users/{user_id}")
+    assert get_res.status_code == 200
+    assert get_res.json()["role"] == "member"
+    assert get_res.json()["full_name"] == "Upgraded Member Person"
+
+    # Cleanup
+    client.delete(f"/users/{user_id}")
+
+
+def test_update_user_without_password(client):
+    import uuid
+    unique_email = f"nopass.{uuid.uuid4().hex[:8]}@gym.com"
+    new_user = {
+        "email": unique_email,
+        "full_name": "No Pass User",
+        "role": "user",
+        "password": "originalpassword",
+        "is_active": True
+    }
+    create_res = client.post("/users", json=new_user)
+    assert create_res.status_code == 201
+    user_id = create_res.json()["id"]
+
+    # Update without supplying password
+    update_res = client.put(f"/users/{user_id}", json={
+        "email": unique_email,
+        "full_name": "Updated No Pass User",
+        "role": "member",
+        "is_active": True
+    })
+    assert update_res.status_code == 200
+    assert update_res.json()["role"] == "member"
+    assert update_res.json()["full_name"] == "Updated No Pass User"
+
+    # Verify original password still works for login
+    login_res = client.post("/users/login", json={"email": unique_email, "password": "originalpassword"})
+    assert login_res.status_code == 200
+
+    # Cleanup
+    client.delete(f"/users/{user_id}")

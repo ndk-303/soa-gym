@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { plansApi, membersApi, invoicesApi } from '../../services/api'
+import { useAuth } from '../../context/AuthContext'
+import { plansApi, membersApi, invoicesApi, usersApi } from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { formatVnd } from '../../components/managementUtils'
 import { ManagementModal } from '../../components/ManagementUI'
@@ -7,6 +8,7 @@ import { useToast } from '../../context/ToastContext'
 
 export default function MemberPlansPage({ currentMember, onMemberRefresh, onTabChange }) {
   const toast = useToast()
+  const { user, updateUserSession } = useAuth()
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -51,7 +53,7 @@ export default function MemberPlansPage({ currentMember, onMemberRefresh, onTabC
     setRegistering(true)
     setRegisterError(null)
     try {
-      // 1. Update member's plan
+      // 1. Update member's plan in membership-service
       await membersApi.update(currentMember.id, {
         user_id: currentMember.user_id,
         full_name: currentMember.full_name,
@@ -60,7 +62,7 @@ export default function MemberPlansPage({ currentMember, onMemberRefresh, onTabC
         membership_plan_id: selectedPlan.id,
       })
 
-      // 2. Create paid invoice for test environment
+      // 2. Create paid invoice for test environment in billing-service
       await invoicesApi.create({
         member_id: currentMember.id,
         amount: Number(selectedPlan.price),
@@ -68,7 +70,22 @@ export default function MemberPlansPage({ currentMember, onMemberRefresh, onTabC
         status: 'paid',
       })
 
-      setRegisterSuccess(`Chúc mừng bạn đã đăng ký thành công ${selectedPlan.name}! Gói tập đã được kích hoạt.`)
+      // 3. Upgrade user's role from 'user' to 'member' if not already member/trainer/admin
+      if (user?.role === 'user' || user?.role !== 'member') {
+        try {
+          const roleRes = await usersApi.updateRole(currentMember.user_id, 'member')
+          if (roleRes.data?.user) {
+            updateUserSession(roleRes.data.user, roleRes.data.access_token)
+          } else {
+            updateUserSession({ role: 'member' })
+          }
+        } catch (roleErr) {
+          console.warn('Could not update user role to member:', roleErr)
+          updateUserSession({ role: 'member' })
+        }
+      }
+
+      setRegisterSuccess(`Chúc mừng bạn đã đăng ký thành công ${selectedPlan.name}! Gói tập đã được kích hoạt và vai trò đã chuyển sang Hội viên (Member).`)
       toast.success(`Đã đăng ký ${selectedPlan.name} thành công!`)
       onMemberRefresh?.()
 

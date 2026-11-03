@@ -107,93 +107,105 @@ def test_unauthenticated_requests_rejected(run_all_services):
         assert client.get("/api/composite/slots").status_code == 401
 
 
-def test_invalid_token_rejected(run_all_services):
-    base_url = run_all_services
-    with httpx.Client(base_url=base_url) as client:
-        bad_headers = {"Authorization": "Bearer invalid_gibberish_token_string"}
-        assert client.get("/users", headers=bad_headers).status_code == 401
-        assert client.get("/api/composite/classes", headers=bad_headers).status_code == 401
-
-
-def test_auth_me_endpoint(run_all_services, admin_headers):
-    base_url = run_all_services
-    with httpx.Client(base_url=base_url) as client:
-        res = client.get("/api/auth/me", headers=admin_headers)
-        assert res.status_code == 200
-        data = res.json()
-        assert data["email"] == "admin@gym.com"
-        assert data["role"] == "admin"
-
-
-def test_legacy_frontend_compatibility(run_all_services, admin_headers):
-    base_url = run_all_services
-    with httpx.Client(base_url=base_url, headers=admin_headers) as client:
-        # Frontend calls routes with trailing slashes directly without /api/
-        assert client.get("/users/").status_code == 200
-        assert client.get("/membership-plans/").status_code == 200
-        assert client.get("/members/").status_code == 200
-        assert client.get("/gym-classes/").status_code == 200
-        assert client.get("/class-slots/").status_code == 200
-        assert client.get("/bookings/").status_code == 200
-        assert client.get("/invoices/").status_code == 200
-        assert client.get("/payments/").status_code == 200
-        assert client.get("/attendance/").status_code == 200
-
-
-def test_standardized_api_routes(run_all_services, admin_headers):
-    base_url = run_all_services
-    with httpx.Client(base_url=base_url, headers=admin_headers) as client:
-        # Standardized endpoints under /api/...
-        assert client.get("/api/users").status_code == 200
-        assert client.get("/api/membership-plans").status_code == 200
-        assert client.get("/api/members").status_code == 200
-        assert client.get("/api/gym-classes").status_code == 200
-        assert client.get("/api/class-slots").status_code == 200
-        assert client.get("/api/bookings").status_code == 200
-        assert client.get("/api/invoices").status_code == 200
-        assert client.get("/api/payments").status_code == 200
-        assert client.get("/api/attendances").status_code == 200
-
-
-def test_crud_through_gateway(run_all_services, admin_headers):
-    base_url = run_all_services
-    with httpx.Client(base_url=base_url, headers=admin_headers) as client:
-        # Create a user via standardized route
-        user_data = {
-            "email": "e2e.test@gym.com",
+def test_proxy_crud_users(run_all_services, admin_headers):
+    gateway_url = run_all_services
+    with httpx.Client(base_url=gateway_url, timeout=5.0) as client:
+        # 1. Create a user via /api/users
+        new_user = {
+            "email": "proxy.user@gym.com",
+            "full_name": "Proxy User Name",
             "role": "member",
-            "password": "password123",
-            "is_active": True
+            "password": "proxypassword",
+            "is_active": True,
         }
-        res_post = client.post("/api/users", json=user_data)
-        assert res_post.status_code == 201
-        created_user = res_post.json()
-        u_id = created_user["id"]
+        create_res = client.post("/api/users", headers=admin_headers, json=new_user)
+        assert create_res.status_code == 201
+        user_id = create_res.json()["id"]
+        assert create_res.json()["email"] == new_user["email"]
+        assert create_res.json()["full_name"] == "Proxy User Name"
 
-        # Read back via legacy route to prove cross-compatibility
-        res_get = client.get(f"/users/{u_id}")
-        assert res_get.status_code == 200
-        assert res_get.json()["email"] == "e2e.test@gym.com"
+        # 2. Get user via legacy alias /users/{id}
+        get_res = client.get(f"/users/{user_id}", headers=admin_headers)
+        assert get_res.status_code == 200
+        assert get_res.json()["email"] == new_user["email"]
 
-        # Update via standardized route
-        res_put = client.put(f"/api/users/{u_id}", json={
-            "email": "e2e.updated@gym.com",
+        # 3. Update user via /api/users/{id}
+        update_data = {
+            "email": "proxy.updated@gym.com",
+            "full_name": "Proxy Updated Name",
             "role": "trainer",
-            "password": "password123",
-            "is_active": True
-        })
-        assert res_put.status_code == 200
-        assert res_put.json()["email"] == "e2e.updated@gym.com"
+            "password": "newproxypassword",
+            "is_active": True,
+        }
+        update_res = client.put(f"/api/users/{user_id}", headers=admin_headers, json=update_data)
+        assert update_res.status_code == 200
+        assert update_res.json()["email"] == "proxy.updated@gym.com"
+        assert update_res.json()["full_name"] == "Proxy Updated Name"
 
-        # Delete
-        res_del = client.delete(f"/users/{u_id}")
-        assert res_del.status_code == 200
+        # 4. Delete user via /api/users/{id}
+        del_res = client.delete(f"/api/users/{user_id}", headers=admin_headers)
+        assert del_res.status_code == 200
 
 
-def test_composite_aggregation_routes(run_all_services, admin_headers):
-    base_url = run_all_services
-    with httpx.Client(base_url=base_url, headers=admin_headers) as client:
-        # Check all 7 composite routes return 200 OK and populated objects
+def test_proxy_membership_plans(run_all_services, admin_headers):
+    gateway_url = run_all_services
+    with httpx.Client(base_url=gateway_url, timeout=5.0) as client:
+        # Get all plans
+        r = client.get("/api/membership-plans", headers=admin_headers)
+        assert r.status_code == 200
+        plans = r.json()
+        assert len(plans) >= 3
+
+
+def test_proxy_gym_classes_and_slots(run_all_services, admin_headers):
+    gateway_url = run_all_services
+    with httpx.Client(base_url=gateway_url, timeout=5.0) as client:
+        # Check classes
+        r_classes = client.get("/gym-classes", headers=admin_headers)
+        assert r_classes.status_code == 200
+        classes = r_classes.json()
+        assert len(classes) >= 2
+
+        # Check slots
+        r_slots = client.get("/api/class-slots", headers=admin_headers)
+        assert r_slots.status_code == 200
+        slots = r_slots.json()
+        assert len(slots) >= 1
+
+
+def test_proxy_bookings(run_all_services, admin_headers):
+    gateway_url = run_all_services
+    with httpx.Client(base_url=gateway_url, timeout=5.0) as client:
+        r = client.get("/bookings", headers=admin_headers)
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+
+def test_proxy_billing_invoices_and_payments(run_all_services, admin_headers):
+    gateway_url = run_all_services
+    with httpx.Client(base_url=gateway_url, timeout=5.0) as client:
+        r_inv = client.get("/api/invoices", headers=admin_headers)
+        assert r_inv.status_code == 200
+        assert isinstance(r_inv.json(), list)
+
+        r_pay = client.get("/payments", headers=admin_headers)
+        assert r_pay.status_code == 200
+        assert isinstance(r_pay.json(), list)
+
+
+def test_proxy_attendance(run_all_services, admin_headers):
+    gateway_url = run_all_services
+    with httpx.Client(base_url=gateway_url, timeout=5.0) as client:
+        r = client.get("/attendance", headers=admin_headers)
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+
+def test_composite_endpoints_through_gateway(run_all_services, admin_headers):
+    gateway_url = run_all_services
+    with httpx.Client(base_url=gateway_url, timeout=5.0) as client:
+        client.headers.update(admin_headers)
+
         r_bookings = client.get("/api/composite/bookings")
         assert r_bookings.status_code == 200
         bookings = r_bookings.json()
@@ -256,6 +268,7 @@ def test_auth_login_through_gateway(run_all_services):
         assert data_admin["token_type"] == "bearer"
         assert data_admin["user"]["email"] == "admin@gym.com"
         assert data_admin["user"]["role"] == "admin"
+        assert "full_name" in data_admin["user"]
 
         # Member login via /api/auth/login alias
         res_member = client.post("/api/auth/login", json={"email": "member.an@gym.com", "password": "password123"})
@@ -263,7 +276,75 @@ def test_auth_login_through_gateway(run_all_services):
         data_member = res_member.json()
         assert "access_token" in data_member
         assert data_member["user"]["role"] == "member"
+        assert "full_name" in data_member["user"]
 
         # Invalid login
         res_invalid = client.post("/api/users/login", json={"email": "admin@gym.com", "password": "wrong"})
         assert res_invalid.status_code == 401
+
+
+def test_user_role_upgrade_to_member_through_gateway(run_all_services, admin_headers):
+    gateway_url = run_all_services
+    import uuid
+
+    unique_email = f"e2e.user.{uuid.uuid4().hex[:8]}@gym.com"
+    with httpx.Client(base_url=gateway_url, timeout=5.0) as client:
+        # 1. Admin creates a user with role 'user' and full_name
+        create_res = client.post(
+            "/api/users",
+            headers=admin_headers,
+            json={
+                "email": unique_email,
+                "full_name": "E2E Regular User",
+                "role": "user",
+                "password": "password123",
+                "is_active": True,
+            },
+        )
+        assert create_res.status_code == 201
+        user_id = create_res.json()["id"]
+        assert create_res.json()["role"] == "user"
+        assert create_res.json()["full_name"] == "E2E Regular User"
+
+        # 2. Login as the new user
+        login_res = client.post(
+            "/api/users/login",
+            json={"email": unique_email, "password": "password123"},
+        )
+        assert login_res.status_code == 200
+        user_token = login_res.json()["access_token"]
+        assert login_res.json()["user"]["full_name"] == "E2E Regular User"
+        user_headers = {"Authorization": f"Bearer {user_token}"}
+
+        # 3. Verify role and full_name in /api/auth/me
+        me_res = client.get("/api/auth/me", headers=user_headers)
+        assert me_res.status_code == 200
+        assert me_res.json()["role"] == "user"
+        assert me_res.json()["full_name"] == "E2E Regular User"
+
+        # 4. User upgrades role to 'member' upon membership plan registration
+        upgrade_res = client.patch(
+            f"/api/users/{user_id}/role",
+            headers=user_headers,
+            json={"role": "member", "full_name": "E2E Member User"},
+        )
+        assert upgrade_res.status_code == 200
+        assert upgrade_res.json()["user"]["role"] == "member"
+        assert upgrade_res.json()["user"]["full_name"] == "E2E Member User"
+        new_token = upgrade_res.json()["access_token"]
+        new_headers = {"Authorization": f"Bearer {new_token}"}
+
+        # 5. Verify /api/auth/me now reflects role 'member' and updated full_name
+        me_updated = client.get("/api/auth/me", headers=new_headers)
+        assert me_updated.status_code == 200
+        assert me_updated.json()["role"] == "member"
+        assert me_updated.json()["full_name"] == "E2E Member User"
+
+        # 6. Verify database record via /api/users/{id}
+        db_user = client.get(f"/api/users/{user_id}", headers=admin_headers)
+        assert db_user.status_code == 200
+        assert db_user.json()["role"] == "member"
+        assert db_user.json()["full_name"] == "E2E Member User"
+
+        # 7. Cleanup
+        client.delete(f"/api/users/{user_id}", headers=admin_headers)

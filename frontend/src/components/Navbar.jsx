@@ -9,9 +9,10 @@ export default function Navbar({ onMenuToggle }) {
     localStorage.removeItem('soa-theme')
   }, [])
 
-  const roleLabel = isAdmin ? 'Quản trị viên' : isTrainer ? 'Huấn luyện viên' : 'Hội viên'
-  const roleAvatarClass = isAdmin ? 'is-admin' : isTrainer ? 'is-trainer' : 'is-member'
-  const roleInitial = isAdmin ? 'A' : isTrainer ? 'T' : 'M'
+  const isUser = user?.role === 'user'
+  const roleLabel = isAdmin ? 'Quản trị viên' : isTrainer ? 'Huấn luyện viên' : isUser ? 'Người dùng' : 'Hội viên'
+  const roleAvatarClass = isAdmin ? 'is-admin' : isTrainer ? 'is-trainer' : isUser ? 'is-user' : 'is-member'
+  const roleInitial = isAdmin ? 'A' : isTrainer ? 'T' : isUser ? 'U' : 'M'
 
   return (
     <nav className="app-navbar">
@@ -28,17 +29,17 @@ export default function Navbar({ onMenuToggle }) {
       <div className="app-navbar-meta">
         <span
           className={`admin-avatar ${roleAvatarClass}`}
-          title={`${roleLabel} - ${user?.email}`}
+          title={`${user?.full_name ? `${user.full_name} (${roleLabel})` : roleLabel} - ${user?.email}`}
         >
           {roleInitial}
         </span>
 
         <div className="navbar-user-block">
-          <span className="navbar-user-role">
-            {roleLabel}
+          <span className="navbar-user-role" title={user?.full_name || roleLabel}>
+            {user?.full_name || roleLabel}
           </span>
-          <span className="navbar-user-email">
-            {user?.email}
+          <span className="navbar-user-email" title={user?.email}>
+            {user?.full_name ? `${roleLabel} • ${user?.email}` : user?.email}
           </span>
         </div>
 

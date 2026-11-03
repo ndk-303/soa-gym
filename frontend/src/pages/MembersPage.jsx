@@ -48,7 +48,7 @@ export default function MembersPage() {
       setUsers(usersRes.data)
       setPlans(plansRes.data)
     } catch (err) {
-      setError(err.message || 'Lỗi khi tải dữ liệu hội viên')
+      setError(err.message || 'Lỗi khi tải danh sách hội viên')
     } finally {
       setLoading(false)
     }
@@ -56,16 +56,12 @@ export default function MembersPage() {
 
   const handleOpenAdd = () => {
     setEditingId(null)
-    const assignedUserIds = members.map((m) => m.user_id)
-    const availableUsers = users.filter((u) => !assignedUserIds.includes(u.id))
-    const defaultUser = availableUsers.length > 0 ? availableUsers[0] : (users[0] || null)
-
     setFormData({
-      user_id: defaultUser ? defaultUser.id : '',
+      user_id: '',
       full_name: '',
-      email: defaultUser ? defaultUser.email : '',
+      email: '',
       status: 'active',
-      membership_plan_id: plans.length > 0 ? plans[0].id : '',
+      membership_plan_id: '',
     })
     setFormError(null)
     setShowModal(true)
@@ -89,6 +85,7 @@ export default function MembersPage() {
     setFormData({
       ...formData,
       user_id: selectedUserId,
+      full_name: selectedUser?.full_name ? selectedUser.full_name : formData.full_name,
       email: selectedUser ? selectedUser.email : formData.email,
     })
   }
@@ -138,6 +135,19 @@ export default function MembersPage() {
         await membersApi.create(payload)
         toast.success('Thêm mới hội viên thành công')
       }
+
+      // If a membership plan was assigned, upgrade linked user role to 'member' if currently 'user'
+      if (payload.membership_plan_id && payload.user_id) {
+        const linkedUser = users.find((u) => Number(u.id) === Number(payload.user_id))
+        if (linkedUser && linkedUser.role === 'user') {
+          try {
+            await usersApi.updateRole(payload.user_id, 'member')
+          } catch (roleErr) {
+            console.warn('Could not upgrade user role to member:', roleErr)
+          }
+        }
+      }
+
       handleCloseModal()
       fetchData()
     } catch (err) {
@@ -261,7 +271,7 @@ export default function MembersPage() {
                 <div className="identity-email">{m.email || 'Chưa có email'}</div>
               </td>
               <td>
-                <span className="linked-value"><i className="bi bi-person"></i>{linkedUser ? linkedUser.email : `Tài khoản #${m.user_id}`}</span>
+                <span className="linked-value"><i className="bi bi-person"></i>{linkedUser ? (linkedUser.full_name ? `${linkedUser.full_name} (${linkedUser.email})` : linkedUser.email) : `Tài khoản #${m.user_id}`}</span>
               </td>
               <td>
                 {linkedPlan ? (
@@ -310,7 +320,7 @@ export default function MembersPage() {
                   const isAssigned = members.some((m) => m.user_id === u.id && m.id !== editingId)
                   return (
                     <option key={u.id} value={u.id} disabled={isAssigned}>
-                      {u.email} ({u.role}) {isAssigned ? '- [Đã có hồ sơ]' : ''}
+                      {u.full_name ? `${u.full_name} (${u.email})` : u.email} [{u.role}] {isAssigned ? '- [Đã có hồ sơ]' : ''}
                     </option>
                   )
                 })}

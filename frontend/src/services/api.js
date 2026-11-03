@@ -41,12 +41,12 @@ export const authApi = {
   getMe: () => apiClient.get('/api/auth/me'),
 }
 
-
 export const usersApi = {
   getAll: () => apiClient.get('/users'),
   getById: (id) => apiClient.get(`/users/${id}`),
   create: (data) => apiClient.post('/users', data),
   update: (id, data) => apiClient.put(`/users/${id}`, data),
+  updateRole: (id, role) => apiClient.patch(`/users/${id}/role`, { role }),
   delete: (id) => apiClient.delete(`/users/${id}`),
 }
 
@@ -132,4 +132,3 @@ export const compositeApi = {
 }
 
 export default apiClient
-
