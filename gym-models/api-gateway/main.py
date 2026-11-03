@@ -425,16 +425,27 @@ async def composite_slots(current_user: dict = Depends(verify_jwt_token)):
         tasks = [
             fetch_json(client, f"{CLASS_SERVICE_URL}/class-slots"),
             fetch_json(client, f"{CLASS_SERVICE_URL}/gym-classes"),
+            fetch_json(client, f"{BOOKING_SERVICE_URL}/bookings"),
         ]
-        slots_data, classes_data = await asyncio.gather(*tasks)
+        slots_data, classes_data, bookings_data = await asyncio.gather(*tasks)
 
         class_map = {c["id"]: c for c in (classes_data or []) if isinstance(c, dict) and "id" in c}
+
+        booking_counts = {}
+        if isinstance(bookings_data, list):
+            for b in bookings_data:
+                if isinstance(b, dict) and b.get("status") != "cancelled":
+                    slot_id = b.get("slot_id")
+                    if slot_id is not None:
+                        booking_counts[slot_id] = booking_counts.get(slot_id, 0) + 1
 
         enriched_slots = []
         for s in (slots_data or []):
             if isinstance(s, dict):
                 s_copy = dict(s)
                 s_copy["class"] = class_map.get(s.get("class_id"))
+                if isinstance(bookings_data, list):
+                    s_copy["current_bookings"] = booking_counts.get(s.get("id"), 0)
                 enriched_slots.append(s_copy)
 
         return enriched_slots

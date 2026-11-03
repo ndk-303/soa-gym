@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { slotsApi, classesApi } from '../services/api'
+import { slotsApi, classesApi, bookingsApi } from '../services/api'
 import StatusBadge from '../components/StatusBadge'
 import { ActionMenu, ManagementHeader, ManagementTable, ManagementFilterBar, ManagementModal } from '../components/ManagementUI'
 import { formatSchedule, toDatetimeLocalValue, fromDatetimeLocalValue, getNowDatetimeLocalValue } from '../components/managementUtils'
@@ -13,6 +13,7 @@ export default function SlotsPage() {
   const [slots, setSlots] = useState([])
 
   const [classes, setClasses] = useState([])
+  const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -41,12 +42,14 @@ export default function SlotsPage() {
     setLoading(true)
     setError(null)
     try {
-      const [slotsRes, classesRes] = await Promise.all([
+      const [slotsRes, classesRes, bookingsRes] = await Promise.all([
         slotsApi.getDetailed(),
         classesApi.getAll(),
+        bookingsApi.getAll().catch(() => ({ data: [] })),
       ])
       setSlots(slotsRes.data)
       setClasses(classesRes.data)
+      setBookings(bookingsRes.data || [])
     } catch (err) {
       setError(err.message || 'Lỗi khi tải danh sách ca tập')
     } finally {
@@ -158,6 +161,16 @@ export default function SlotsPage() {
 
   const classMap = useMemo(() => Object.fromEntries(classes.map((c) => [c.id, c])), [classes])
 
+  const bookingCountBySlot = useMemo(() => {
+    return bookings.reduce((counts, b) => {
+      if (b.status !== 'cancelled') {
+        const sid = Number(b.slot_id)
+        counts[sid] = (counts[sid] || 0) + 1
+      }
+      return counts
+    }, {})
+  }, [bookings])
+
   const statusOptions = [
     { value: 'all', label: 'Tất cả trạng thái' },
     { value: 'active', label: 'Đang mở (Khả dụng)' },
@@ -243,6 +256,7 @@ export default function SlotsPage() {
       >
         {filteredSlots.map((s) => {
           const linkedClass = s.class || classMap[s.class_id]
+          const currentBookings = bookingCountBySlot[s.id] ?? s.current_bookings ?? 0
           return (
             <tr key={s.id}>
               <td>
@@ -251,8 +265,8 @@ export default function SlotsPage() {
               </td>
               <td>{(() => { const schedule = formatSchedule(s.start_time); return <><div className="schedule-date">{schedule.date}</div><div className="schedule-time">{schedule.time}</div></> })()}</td>
               <td>
-                <div className="capacity-label"><span><strong>{s.current_bookings}</strong> / {s.max_capacity} chỗ</span></div>
-                <div className="capacity-bar"><span style={{ width: `${Math.min(100, (s.current_bookings / (s.max_capacity || 1)) * 100)}%` }}></span>
+                <div className="capacity-label"><span><strong>{currentBookings}</strong> / {s.max_capacity} chỗ</span></div>
+                <div className="capacity-bar"><span style={{ width: `${Math.min(100, (currentBookings / (s.max_capacity || 1)) * 100)}%` }}></span>
                 </div>
               </td>
               <td>

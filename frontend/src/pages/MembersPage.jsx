@@ -57,8 +57,9 @@ export default function MembersPage() {
   const handleOpenAdd = () => {
     setEditingId(null)
     const assignedUserIds = members.map((m) => m.user_id)
-    const availableUsers = users.filter((u) => !assignedUserIds.includes(u.id))
-    const defaultUser = availableUsers.length > 0 ? availableUsers[0] : (users[0] || null)
+    const memberUsers = users.filter((u) => u.role === 'member')
+    const availableUsers = memberUsers.filter((u) => !assignedUserIds.includes(u.id))
+    const defaultUser = availableUsers.length > 0 ? availableUsers[0] : (memberUsers[0] || null)
 
     setFormData({
       user_id: defaultUser ? defaultUser.id : '',
@@ -109,6 +110,12 @@ export default function MembersPage() {
 
     if (!formData.user_id) {
       setFormError('Vui lòng chọn tài khoản người dùng liên kết với hội viên')
+      setSubmitting(false)
+      return
+    }
+    const selectedUser = users.find((u) => u.id === Number(formData.user_id))
+    if (selectedUser && selectedUser.role !== 'member') {
+      setFormError(`Tài khoản ${selectedUser.email} có vai trò là '${selectedUser.role}'. Chỉ tài khoản vai trò 'member' mới có thể tạo hồ sơ hội viên.`)
       setSubmitting(false)
       return
     }
@@ -305,12 +312,20 @@ export default function MembersPage() {
                 onChange={(e) => handleUserSelect(e.target.value)}
                 required
               >
-                <option value="">-- Chọn tài khoản User --</option>
+                <option value="">-- Chọn tài khoản User (chỉ áp dụng cho tài khoản Hội viên) --</option>
                 {users.map((u) => {
+                  const isMemberRole = u.role === 'member'
                   const isAssigned = members.some((m) => m.user_id === u.id && m.id !== editingId)
+                  const isDisabled = !isMemberRole || isAssigned
+                  let statusNote = ''
+                  if (!isMemberRole) {
+                    statusNote = `- [Vai trò ${u.role}: Không thể tạo hồ sơ hội viên]`
+                  } else if (isAssigned) {
+                    statusNote = '- [Đã có hồ sơ]'
+                  }
                   return (
-                    <option key={u.id} value={u.id} disabled={isAssigned}>
-                      {u.email} ({u.role}) {isAssigned ? '- [Đã có hồ sơ]' : ''}
+                    <option key={u.id} value={u.id} disabled={isDisabled}>
+                      {u.email} ({u.role}) {statusNote}
                     </option>
                   )
                 })}
