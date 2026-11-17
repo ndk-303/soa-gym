@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float
 from database import Base
+    transaction_ref = Column(String, nullable=True, index=True)
 
 
 class Invoice(Base):

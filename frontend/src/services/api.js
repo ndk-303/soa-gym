@@ -112,6 +112,10 @@ export const paymentsApi = {
   delete: (id) => apiClient.delete(`/payments/${id}`),
 }
 
+export const vnpayApi = {
+  createPaymentUrl: (invoiceId) => apiClient.post('/api/payments/vnpay/create', { invoice_id: invoiceId }),
+}
+
 export const attendanceApi = {
   getAll: () => apiClient.get('/attendance'),
   getDetailed: () => apiClient.get('/api/composite/attendance'),

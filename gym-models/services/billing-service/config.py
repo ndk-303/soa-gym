@@ -23,6 +23,11 @@ class BillingSettings(BaseSettings):
     DATABASE_URL: Optional[str] = None
 
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+    VNPAY_URL: str = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+    VNPAY_TMN_CODE: str = ""
+    VNPAY_HASH_SECRET: str = ""
+    VNPAY_RETURN_URL: str = "http://localhost:8000/api/payments/vnpay/return"
+    VNPAY_ORDER_TYPE: str = "other"
 
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,

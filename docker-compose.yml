@@ -1,4 +1,5 @@
 services:
+
   user-service:
     build:
       context: ./gym-models
@@ -6,6 +7,8 @@ services:
     environment:
       ENVIRONMENT: production
       DATABASE_URL: sqlite:////data/user.db
+    ports:
+      - "8001:8001"
     volumes:
       - user-data:/data
     networks:
@@ -18,6 +21,8 @@ services:
     environment:
       ENVIRONMENT: production
       DATABASE_URL: sqlite:////data/membership.db
+    ports:
+      - "8002:8002"
     volumes:
       - membership-data:/data
     networks:
@@ -30,6 +35,8 @@ services:
     environment:
       ENVIRONMENT: production
       DATABASE_URL: sqlite:////data/class.db
+    ports:
+      - "8003:8003"
     volumes:
       - class-data:/data
     networks:
@@ -44,6 +51,8 @@ services:
       DATABASE_URL: sqlite:////data/booking.db
       CLASS_SERVICE_URL: http://class-service:8003
       MEMBERSHIP_SERVICE_URL: http://membership-service:8002
+    ports:
+      - "8004:8004"
     volumes:
       - booking-data:/data
     depends_on:
@@ -56,9 +65,13 @@ services:
     build:
       context: ./gym-models
       dockerfile: services/billing-service/Dockerfile
+    env_file:
+      - ./gym-models/.env
     environment:
       ENVIRONMENT: production
       DATABASE_URL: sqlite:////data/billing.db
+    ports:
+      - "8005:8005"
     volumes:
       - billing-data:/data
     networks:
@@ -72,6 +85,8 @@ services:
       ENVIRONMENT: production
       DATABASE_URL: sqlite:////data/attendance.db
       MEMBERSHIP_SERVICE_URL: http://membership-service:8002
+    ports:
+      - "8006:8006"
     volumes:
       - attendance-data:/data
     depends_on:

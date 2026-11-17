@@ -92,3 +92,24 @@ Xóa cả dữ liệu SQLite:
 ```bash
 docker compose down -v
 ```
+
+## 6. VNPay Sandbox
+
+Điền thông tin tài khoản Sandbox vào `gym-models/.env`:
+
+```env
+VNPAY_TMN_CODE=your_sandbox_tmn_code
+VNPAY_HASH_SECRET=your_sandbox_hash_secret
+```
+
+Tạo URL thanh toán cho một hóa đơn chưa thanh toán:
+
+```http
+POST http://localhost:8000/api/payments/vnpay/create
+Content-Type: application/json
+
+{"invoice_id": 2}
+```
+
+Mở `payment_url` được trả về để thực hiện thanh toán trên VNPay Sandbox.
+
