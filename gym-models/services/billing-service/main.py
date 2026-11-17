@@ -1,9 +1,11 @@
 import sys
 import os
+import threading
 from typing import Annotated
 from fastapi import FastAPI, HTTPException, Depends
 from starlette import status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 from fastapi.middleware.cors import CORSMiddleware
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -29,6 +31,39 @@ app.add_middleware(
 models.Base.metadata.create_all(bind=engine)
 
 db_dependency = Annotated[Session, Depends(get_db)]
+
+# Concurrency lock for atomic invoice and payment mutations
+billing_lock = threading.RLock()
+
+
+def _commit_with_rollback(db: Session):
+    """Commit transaction safely, rolling back on SQLAlchemyError."""
+    try:
+        db.commit()
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: {str(exc)}",
+        )
+
+
+def _recalculate_invoice_in_tx(db: Session, invoice_id: int):
+    """Recompute invoice amount_paid and status inside the active transaction."""
+    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if invoice is None:
+        return
+    payments = db.query(Payment).filter(Payment.invoice_id == invoice_id).all()
+    total_paid = round(sum(float(p.amount or 0.0) for p in payments), 2)
+    invoice.amount_paid = total_paid
+    if invoice.status != "cancelled":
+        if invoice.amount_paid >= float(invoice.amount or 0.0):
+            invoice.status = "paid"
+        elif invoice.amount_paid > 0:
+            invoice.status = "partially_paid"
+        else:
+            invoice.status = "pending"
+    db.add(invoice)
 
 
 @app.on_event("startup")
@@ -72,37 +107,50 @@ async def get_invoice(db: db_dependency, id: int):
 
 
 @app.post("/invoices", status_code=status.HTTP_201_CREATED)
-async def create_invoice(db: db_dependency, invoice_request: Invoice_Request):
-    invoice_model = Invoice(**invoice_request.dict())
-    db.add(invoice_model)
-    db.commit()
-    db.refresh(invoice_model)
-    return invoice_model
+def create_invoice(db: db_dependency, invoice_request: Invoice_Request):
+    with billing_lock:
+        if invoice_request.amount_paid > invoice_request.amount:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="amount_paid cannot exceed invoice amount",
+            )
+        invoice_model = Invoice(**invoice_request.dict())
+        db.add(invoice_model)
+        _commit_with_rollback(db)
+        db.refresh(invoice_model)
+        return invoice_model
 
 
 @app.put("/invoices/{id}")
-async def update_invoice(db: db_dependency, id: int, invoice_request: Invoice_Request):
-    invoice = db.query(Invoice).filter(Invoice.id == id).first()
-    if invoice is None:
-        raise HTTPException(status_code=404, detail="Invoice not found")
-    invoice.member_id = invoice_request.member_id
-    invoice.amount = invoice_request.amount
-    invoice.amount_paid = invoice_request.amount_paid
-    invoice.status = invoice_request.status
-    db.add(invoice)
-    db.commit()
-    db.refresh(invoice)
-    return invoice
+def update_invoice(db: db_dependency, id: int, invoice_request: Invoice_Request):
+    with billing_lock:
+        invoice = db.query(Invoice).filter(Invoice.id == id).first()
+        if invoice is None:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+        if invoice_request.amount_paid > invoice_request.amount:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="amount_paid cannot exceed invoice amount",
+            )
+        invoice.member_id = invoice_request.member_id
+        invoice.amount = invoice_request.amount
+        invoice.amount_paid = invoice_request.amount_paid
+        invoice.status = invoice_request.status
+        db.add(invoice)
+        _commit_with_rollback(db)
+        db.refresh(invoice)
+        return invoice
 
 
 @app.delete("/invoices/{id}")
-async def delete_invoice(db: db_dependency, id: int):
-    invoice = db.query(Invoice).filter(Invoice.id == id).first()
-    if invoice is None:
-        raise HTTPException(status_code=404, detail="Invoice not found")
-    db.delete(invoice)
-    db.commit()
-    return {"message": "Invoice deleted successfully"}
+def delete_invoice(db: db_dependency, id: int):
+    with billing_lock:
+        invoice = db.query(Invoice).filter(Invoice.id == id).first()
+        if invoice is None:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+        db.delete(invoice)
+        _commit_with_rollback(db)
+        return {"message": "Invoice deleted successfully"}
 
 
 # ==================== Payments Endpoints ====================
@@ -121,37 +169,70 @@ async def get_payment(db: db_dependency, id: int):
 
 
 @app.post("/payments", status_code=status.HTTP_201_CREATED)
-async def create_payment(db: db_dependency, payment_request: Payment_Request):
-    payment_model = Payment(**payment_request.dict())
-    db.add(payment_model)
-    db.commit()
-    db.refresh(payment_model)
-    return payment_model
+def create_payment(db: db_dependency, payment_request: Payment_Request):
+    with billing_lock:
+        invoice = db.query(Invoice).filter(Invoice.id == payment_request.invoice_id).first()
+        if invoice is None:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+        if invoice.status == "cancelled":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot record payment for a cancelled invoice",
+            )
+
+        payment_model = Payment(**payment_request.dict())
+        db.add(payment_model)
+        db.flush()
+        _recalculate_invoice_in_tx(db, payment_model.invoice_id)
+        _commit_with_rollback(db)
+        db.refresh(payment_model)
+        return payment_model
 
 
 @app.put("/payments/{id}")
-async def update_payment(db: db_dependency, id: int, payment_request: Payment_Request):
-    payment = db.query(Payment).filter(Payment.id == id).first()
-    if payment is None:
-        raise HTTPException(status_code=404, detail="Payment not found")
-    payment.invoice_id = payment_request.invoice_id
-    payment.amount = payment_request.amount
-    payment.payment_method = payment_request.payment_method
-    payment.notes = payment_request.notes
-    db.add(payment)
-    db.commit()
-    db.refresh(payment)
-    return payment
+def update_payment(db: db_dependency, id: int, payment_request: Payment_Request):
+    with billing_lock:
+        payment = db.query(Payment).filter(Payment.id == id).first()
+        if payment is None:
+            raise HTTPException(status_code=404, detail="Payment not found")
+
+        target_invoice = db.query(Invoice).filter(Invoice.id == payment_request.invoice_id).first()
+        if target_invoice is None:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+        if target_invoice.status == "cancelled":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot assign payment to a cancelled invoice",
+            )
+
+        old_invoice_id = payment.invoice_id
+        payment.invoice_id = payment_request.invoice_id
+        payment.amount = payment_request.amount
+        payment.payment_method = payment_request.payment_method
+        payment.notes = payment_request.notes
+        db.add(payment)
+        db.flush()
+
+        _recalculate_invoice_in_tx(db, old_invoice_id)
+        if payment.invoice_id != old_invoice_id:
+            _recalculate_invoice_in_tx(db, payment.invoice_id)
+        _commit_with_rollback(db)
+        db.refresh(payment)
+        return payment
 
 
 @app.delete("/payments/{id}")
-async def delete_payment(db: db_dependency, id: int):
-    payment = db.query(Payment).filter(Payment.id == id).first()
-    if payment is None:
-        raise HTTPException(status_code=404, detail="Payment not found")
-    db.delete(payment)
-    db.commit()
-    return {"message": "Payment deleted successfully"}
+def delete_payment(db: db_dependency, id: int):
+    with billing_lock:
+        payment = db.query(Payment).filter(Payment.id == id).first()
+        if payment is None:
+            raise HTTPException(status_code=404, detail="Payment not found")
+        invoice_id = payment.invoice_id
+        db.delete(payment)
+        db.flush()
+        _recalculate_invoice_in_tx(db, invoice_id)
+        _commit_with_rollback(db)
+        return {"message": "Payment deleted successfully"}
 
 
 if __name__ == "__main__":

@@ -22,6 +22,8 @@ class AttendanceSettings(BaseSettings):
     ATTENDANCE_DATABASE_URL: Optional[str] = None
     DATABASE_URL: Optional[str] = None
 
+    MEMBERSHIP_SERVICE_URL: str = "http://127.0.0.1:8002"
+
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
 
     model_config = SettingsConfigDict(

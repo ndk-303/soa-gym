@@ -198,3 +198,33 @@ def test_update_user_without_password(client):
 
     # Cleanup
     client.delete(f"/users/{user_id}")
+
+
+def test_create_duplicate_email_returns_409(client):
+    import uuid
+    unique_email = f"dup.{uuid.uuid4().hex[:8]}@gym.com"
+    payload = {
+        "email": unique_email,
+        "full_name": "Duplicate Test",
+        "role": "member",
+        "password": "password123",
+        "is_active": True,
+    }
+    res1 = client.post("/users", json=payload)
+    assert res1.status_code == 201
+    user_id = res1.json()["id"]
+
+    try:
+        res_dup = client.post("/users", json=payload)
+        assert res_dup.status_code == 409
+        assert "already exists" in res_dup.json()["detail"].lower()
+
+        res_upd_dup = client.put(f"/users/{user_id}", json={
+            "email": "admin@gym.com",
+            "full_name": "Duplicate Test",
+            "role": "member",
+            "is_active": True,
+        })
+        assert res_upd_dup.status_code == 409
+    finally:
+        client.delete(f"/users/{user_id}")

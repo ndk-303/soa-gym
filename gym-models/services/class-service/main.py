@@ -1,9 +1,11 @@
 import sys
 import os
+import threading
 from typing import Annotated
 from fastapi import FastAPI, HTTPException, Depends
 from starlette import status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 from fastapi.middleware.cors import CORSMiddleware
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -29,6 +31,42 @@ app.add_middleware(
 models.Base.metadata.create_all(bind=engine)
 
 db_dependency = Annotated[Session, Depends(get_db)]
+
+# Concurrency lock to serialize capacity updates and prevent overbooking
+slot_lock = threading.RLock()
+
+
+def _commit_with_rollback(db: Session):
+    """Commit transaction safely, rolling back on SQLAlchemyError."""
+    try:
+        db.commit()
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: {str(exc)}",
+        )
+
+
+def _check_trainer_conflict(db: Session, gym_class: GymClass, start_time: str, exclude_slot_id: int = None):
+    """Ensure the same trainer does not teach two active slots at the exact same start_time (CB-03)."""
+    trainer_class_ids = [
+        c.id for c in db.query(GymClass).filter(GymClass.trainer_id == gym_class.trainer_id).all()
+    ]
+    if not trainer_class_ids:
+        return
+    query = db.query(ClassSlot).filter(
+        ClassSlot.class_id.in_(trainer_class_ids),
+        ClassSlot.start_time == start_time,
+        ClassSlot.is_cancelled == False,
+    )
+    if exclude_slot_id is not None:
+        query = query.filter(ClassSlot.id != exclude_slot_id)
+    if query.first() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Trainer already has an active slot scheduled at this time",
+        )
 
 
 @app.on_event("startup")
@@ -72,16 +110,16 @@ async def get_class(db: db_dependency, id: int):
 
 
 @app.post("/gym-classes", status_code=status.HTTP_201_CREATED)
-async def create_class(db: db_dependency, class_request: GymClass_Request):
+def create_class(db: db_dependency, class_request: GymClass_Request):
     class_model = GymClass(**class_request.dict())
     db.add(class_model)
-    db.commit()
+    _commit_with_rollback(db)
     db.refresh(class_model)
     return class_model
 
 
 @app.put("/gym-classes/{id}")
-async def update_class(db: db_dependency, id: int, class_request: GymClass_Request):
+def update_class(db: db_dependency, id: int, class_request: GymClass_Request):
     gym_class = db.query(GymClass).filter(GymClass.id == id).first()
     if gym_class is None:
         raise HTTPException(status_code=404, detail="Gym Class not found")
@@ -90,18 +128,18 @@ async def update_class(db: db_dependency, id: int, class_request: GymClass_Reque
     gym_class.trainer_id = class_request.trainer_id
     gym_class.is_active = class_request.is_active
     db.add(gym_class)
-    db.commit()
+    _commit_with_rollback(db)
     db.refresh(gym_class)
     return gym_class
 
 
 @app.delete("/gym-classes/{id}")
-async def delete_class(db: db_dependency, id: int):
+def delete_class(db: db_dependency, id: int):
     gym_class = db.query(GymClass).filter(GymClass.id == id).first()
     if gym_class is None:
         raise HTTPException(status_code=404, detail="Gym Class not found")
     db.delete(gym_class)
-    db.commit()
+    _commit_with_rollback(db)
     return {"message": "Gym Class deleted successfully"}
 
 
@@ -121,38 +159,112 @@ async def get_slot(db: db_dependency, id: int):
 
 
 @app.post("/class-slots", status_code=status.HTTP_201_CREATED)
-async def create_slot(db: db_dependency, slot_request: ClassSlot_Request):
-    slot_model = ClassSlot(**slot_request.dict())
-    db.add(slot_model)
-    db.commit()
-    db.refresh(slot_model)
-    return slot_model
+def create_slot(db: db_dependency, slot_request: ClassSlot_Request):
+    with slot_lock:
+        gym_class = db.query(GymClass).filter(GymClass.id == slot_request.class_id).first()
+        if gym_class is None:
+            raise HTTPException(status_code=404, detail="Gym Class not found")
+        if slot_request.current_bookings > slot_request.max_capacity:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="current_bookings cannot exceed max_capacity",
+            )
+        if not slot_request.is_cancelled:
+            _check_trainer_conflict(db, gym_class, slot_request.start_time)
+
+        slot_model = ClassSlot(**slot_request.dict())
+        db.add(slot_model)
+        _commit_with_rollback(db)
+        db.refresh(slot_model)
+        return slot_model
 
 
 @app.put("/class-slots/{id}")
-async def update_slot(db: db_dependency, id: int, slot_request: ClassSlot_Request):
-    slot = db.query(ClassSlot).filter(ClassSlot.id == id).first()
-    if slot is None:
-        raise HTTPException(status_code=404, detail="Class Slot not found")
-    slot.class_id = slot_request.class_id
-    slot.start_time = slot_request.start_time
-    slot.max_capacity = slot_request.max_capacity
-    slot.current_bookings = slot_request.current_bookings
-    slot.is_cancelled = slot_request.is_cancelled
-    db.add(slot)
-    db.commit()
-    db.refresh(slot)
-    return slot
+def update_slot(db: db_dependency, id: int, slot_request: ClassSlot_Request):
+    with slot_lock:
+        slot = db.query(ClassSlot).filter(ClassSlot.id == id).first()
+        if slot is None:
+            raise HTTPException(status_code=404, detail="Class Slot not found")
+        gym_class = db.query(GymClass).filter(GymClass.id == slot_request.class_id).first()
+        if gym_class is None:
+            raise HTTPException(status_code=404, detail="Gym Class not found")
+        if slot_request.max_capacity < slot_request.current_bookings:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="max_capacity cannot be less than current_bookings",
+            )
+        if not slot_request.is_cancelled:
+            _check_trainer_conflict(db, gym_class, slot_request.start_time, exclude_slot_id=id)
+
+        slot.class_id = slot_request.class_id
+        slot.start_time = slot_request.start_time
+        slot.max_capacity = slot_request.max_capacity
+        slot.current_bookings = slot_request.current_bookings
+        slot.is_cancelled = slot_request.is_cancelled
+        db.add(slot)
+        _commit_with_rollback(db)
+        db.refresh(slot)
+        return slot
 
 
 @app.delete("/class-slots/{id}")
-async def delete_slot(db: db_dependency, id: int):
-    slot = db.query(ClassSlot).filter(ClassSlot.id == id).first()
-    if slot is None:
-        raise HTTPException(status_code=404, detail="Class Slot not found")
-    db.delete(slot)
-    db.commit()
-    return {"message": "Class Slot deleted successfully"}
+def delete_slot(db: db_dependency, id: int):
+    with slot_lock:
+        slot = db.query(ClassSlot).filter(ClassSlot.id == id).first()
+        if slot is None:
+            raise HTTPException(status_code=404, detail="Class Slot not found")
+        db.delete(slot)
+        _commit_with_rollback(db)
+        return {"message": "Class Slot deleted successfully"}
+
+
+# ==================== Internal Booking Capacity Endpoints (Concurrency-Safe) ====================
+
+def _increment_slot_bookings_tx(db: Session, id: int):
+    with slot_lock:
+        slot = db.query(ClassSlot).filter(ClassSlot.id == id).first()
+        if slot is None:
+            raise HTTPException(status_code=404, detail="Class Slot not found")
+        if slot.is_cancelled:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot book a cancelled slot",
+            )
+        current = slot.current_bookings or 0
+        if current >= slot.max_capacity:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Class slot is full",
+            )
+        slot.current_bookings = current + 1
+        db.add(slot)
+        _commit_with_rollback(db)
+        db.refresh(slot)
+        return slot
+
+
+def _decrement_slot_bookings_tx(db: Session, id: int):
+    with slot_lock:
+        slot = db.query(ClassSlot).filter(ClassSlot.id == id).first()
+        if slot is None:
+            raise HTTPException(status_code=404, detail="Class Slot not found")
+        slot.current_bookings = max(0, (slot.current_bookings or 0) - 1)
+        db.add(slot)
+        _commit_with_rollback(db)
+        db.refresh(slot)
+        return slot
+
+
+@app.patch("/class-slots/{id}/increment-bookings")
+@app.post("/class-slots/{id}/increment-bookings")
+def increment_slot_bookings(db: db_dependency, id: int):
+    return _increment_slot_bookings_tx(db, id)
+
+
+@app.patch("/class-slots/{id}/decrement-bookings")
+@app.post("/class-slots/{id}/decrement-bookings")
+def decrement_slot_bookings(db: db_dependency, id: int):
+    return _decrement_slot_bookings_tx(db, id)
 
 
 if __name__ == "__main__":

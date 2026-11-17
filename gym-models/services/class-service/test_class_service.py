@@ -88,3 +88,59 @@ def test_slot_crud(client):
     del_res = client.delete(f"/class-slots/{slot_id}")
     assert del_res.status_code == 200
     assert client.get(f"/class-slots/{slot_id}").status_code == 404
+
+
+def test_slot_increment_decrement_and_concurrency_limit(client):
+    from concurrent.futures import ThreadPoolExecutor
+
+    # Create a slot with max_capacity=2
+    slot_res = client.post("/class-slots", json={
+        "class_id": 1,
+        "start_time": "2026-12-25 18:00:00",
+        "max_capacity": 2,
+        "current_bookings": 0,
+        "is_cancelled": False,
+    })
+    assert slot_res.status_code == 201
+    slot_id = slot_res.json()["id"]
+
+    try:
+        # 1. Trainer conflict: same trainer (class 2 shares trainer_id=2 with class 1) at same time -> 409
+        conflict_res = client.post("/class-slots", json={
+            "class_id": 2,
+            "start_time": "2026-12-25 18:00:00",
+            "max_capacity": 10,
+            "current_bookings": 0,
+            "is_cancelled": False,
+        })
+        assert conflict_res.status_code == 409
+
+        # 2. Concurrent increment-bookings: 5 parallel requests for capacity=2 -> exactly 2 succeed, 3 fail with 409
+        def do_inc(_):
+            return client.patch(f"/class-slots/{slot_id}/increment-bookings").status_code
+
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            codes = list(pool.map(do_inc, range(5)))
+
+        assert codes.count(200) == 2
+        assert codes.count(409) == 3
+
+        slot_now = client.get(f"/class-slots/{slot_id}").json()
+        assert slot_now["current_bookings"] == 2
+
+        # 3. Shrinking max_capacity below current_bookings -> 400 Bad Request
+        shrink_res = client.put(f"/class-slots/{slot_id}", json={
+            "class_id": 1,
+            "start_time": "2026-12-25 18:00:00",
+            "max_capacity": 1,
+            "current_bookings": 2,
+            "is_cancelled": False,
+        })
+        assert shrink_res.status_code == 400
+
+        # 4. Decrement twice -> 0, and third decrement stays at 0 (no negative)
+        assert client.patch(f"/class-slots/{slot_id}/decrement-bookings").json()["current_bookings"] == 1
+        assert client.patch(f"/class-slots/{slot_id}/decrement-bookings").json()["current_bookings"] == 0
+        assert client.patch(f"/class-slots/{slot_id}/decrement-bookings").json()["current_bookings"] == 0
+    finally:
+        client.delete(f"/class-slots/{slot_id}")

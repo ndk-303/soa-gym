@@ -89,3 +89,57 @@ def test_member_crud(client):
     del_res = client.delete(f"/members/{member_id}")
     assert del_res.status_code == 200
     assert client.get(f"/members/{member_id}").status_code == 404
+
+
+def test_duplicate_member_and_invalid_plan(client):
+    # 1. Creating a member with non-existent membership_plan_id returns 400
+    bad_plan_res = client.post("/members", json={
+        "user_id": 99991,
+        "full_name": "Invalid Plan Member",
+        "email": "invalidplan99991@gym.com",
+        "status": "active",
+        "membership_plan_id": 999999,
+    })
+    assert bad_plan_res.status_code == 400
+    assert "plan" in bad_plan_res.json()["detail"].lower()
+
+    # 2. Create a valid member, then test duplicate user_id and duplicate email -> 409
+    res = client.post("/members", json={
+        "user_id": 99992,
+        "full_name": "Unique Member",
+        "email": "uniquemember99992@gym.com",
+        "status": "active",
+        "membership_plan_id": 1,
+    })
+    assert res.status_code == 201
+    member_id = res.json()["id"]
+
+    try:
+        dup_uid = client.post("/members", json={
+            "user_id": 99992,
+            "full_name": "Other Name",
+            "email": "other99992@gym.com",
+            "status": "active",
+            "membership_plan_id": 1,
+        })
+        assert dup_uid.status_code == 409
+
+        dup_email = client.post("/members", json={
+            "user_id": 99993,
+            "full_name": "Other Name",
+            "email": "uniquemember99992@gym.com",
+            "status": "active",
+            "membership_plan_id": 1,
+        })
+        assert dup_email.status_code == 409
+
+        # Duplicate plan name returns 409
+        dup_plan = client.post("/membership-plans", json={
+            "name": "Goi 1 Thang Co Ban",
+            "duration_days": 30,
+            "price": 500000.0,
+            "is_active": True,
+        })
+        assert dup_plan.status_code == 409
+    finally:
+        client.delete(f"/members/{member_id}")
