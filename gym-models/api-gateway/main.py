@@ -11,6 +11,8 @@ from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
     if method == "GET" and clean.endswith("/vnpay/return"):
         return True
+    if method == "GET" and clean.endswith("/vnpay/return"):
+        return True
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:

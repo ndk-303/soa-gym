@@ -6,6 +6,10 @@ class Vnpay_Create_Request(BaseModel):
     invoice_id: int = Field(gt=0)
 
 
+class Vnpay_Create_Request(BaseModel):
+    invoice_id: int = Field(gt=0)
+
+
 class Invoice_Request(BaseModel):
     member_id: int = Field(gt=0)
     amount: float = Field(gt=0, lt=100000000)
