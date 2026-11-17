@@ -106,6 +106,17 @@ services:
     networks:
       - gym-network
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - gym-network
+
 networks:
   gym-network:
     driver: bridge

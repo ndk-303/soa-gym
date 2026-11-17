@@ -73,10 +73,11 @@ Từ thư mục gốc repository:
 docker compose up --build
 ```
 
-Docker Compose tạo 6 microservice và 1 API Gateway trên cùng mạng `gym-network`.
+Docker Compose tạo 6 microservice, 1 API Gateway và 1 frontend trên cùng mạng `gym-network`.
 Gateway gọi các service bằng tên container, ví dụ `http://user-service:8001`.
 SQLite của mỗi service được lưu trong một named volume riêng.
 
+- Frontend: `http://localhost:5173`
 - Swagger Gateway: `http://127.0.0.1:8000/docs`
 - Health check: `http://127.0.0.1:8000/health`
 
