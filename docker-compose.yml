@@ -1,0 +1,119 @@
+services:
+  user-service:
+    build:
+      context: ./gym-models
+      dockerfile: services/user-service/Dockerfile
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: sqlite:////data/user.db
+    volumes:
+      - user-data:/data
+    networks:
+      - gym-network
+
+  membership-service:
+    build:
+      context: ./gym-models
+      dockerfile: services/membership-service/Dockerfile
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: sqlite:////data/membership.db
+    volumes:
+      - membership-data:/data
+    networks:
+      - gym-network
+
+  class-service:
+    build:
+      context: ./gym-models
+      dockerfile: services/class-service/Dockerfile
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: sqlite:////data/class.db
+    volumes:
+      - class-data:/data
+    networks:
+      - gym-network
+
+  booking-service:
+    build:
+      context: ./gym-models
+      dockerfile: services/booking-service/Dockerfile
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: sqlite:////data/booking.db
+      CLASS_SERVICE_URL: http://class-service:8003
+      MEMBERSHIP_SERVICE_URL: http://membership-service:8002
+    volumes:
+      - booking-data:/data
+    depends_on:
+      - class-service
+      - membership-service
+    networks:
+      - gym-network
+
+  billing-service:
+    build:
+      context: ./gym-models
+      dockerfile: services/billing-service/Dockerfile
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: sqlite:////data/billing.db
+    volumes:
+      - billing-data:/data
+    networks:
+      - gym-network
+
+  attendance-service:
+    build:
+      context: ./gym-models
+      dockerfile: services/attendance-service/Dockerfile
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: sqlite:////data/attendance.db
+      MEMBERSHIP_SERVICE_URL: http://membership-service:8002
+    volumes:
+      - attendance-data:/data
+    depends_on:
+      - membership-service
+    networks:
+      - gym-network
+
+  api-gateway:
+    build:
+      context: ./gym-models
+      dockerfile: api-gateway/Dockerfile
+    environment:
+      ENVIRONMENT: production
+      GATEWAY_HOST: 0.0.0.0
+      GATEWAY_PORT: 8000
+      CORS_ORIGINS: http://localhost:5173,http://localhost:3000
+      USER_SERVICE_URL: http://user-service:8001
+      MEMBERSHIP_SERVICE_URL: http://membership-service:8002
+      CLASS_SERVICE_URL: http://class-service:8003
+      BOOKING_SERVICE_URL: http://booking-service:8004
+      BILLING_SERVICE_URL: http://billing-service:8005
+      ATTENDANCE_SERVICE_URL: http://attendance-service:8006
+    ports:
+      - "8000:8000"
+    depends_on:
+      - user-service
+      - membership-service
+      - class-service
+      - booking-service
+      - billing-service
+      - attendance-service
+    networks:
+      - gym-network
+
+networks:
+  gym-network:
+    driver: bridge
+
+volumes:
+  user-data:
+  membership-data:
+  class-data:
+  booking-data:
+  billing-data:
+  attendance-data:

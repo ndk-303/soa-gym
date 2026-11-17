@@ -63,3 +63,31 @@ File `run_all.bat` sẽ tự động kích hoạt môi trường và khởi ch�
 cd gym-models
 pytest test_e2e_system.py -v
 ```
+---
+
+## 5. Chạy Backend bằng Docker Compose
+
+Từ thư mục gốc repository:
+
+```bash
+docker compose up --build
+```
+
+Docker Compose tạo 6 microservice và 1 API Gateway trên cùng mạng `gym-network`.
+Gateway gọi các service bằng tên container, ví dụ `http://user-service:8001`.
+SQLite của mỗi service được lưu trong một named volume riêng.
+
+- Swagger Gateway: `http://127.0.0.1:8000/docs`
+- Health check: `http://127.0.0.1:8000/health`
+
+Dừng hệ thống:
+
+```bash
+docker compose down
+```
+
+Xóa cả dữ liệu SQLite:
+
+```bash
+docker compose down -v
+```
