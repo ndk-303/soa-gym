@@ -9,10 +9,6 @@ from fastapi import FastAPI, Request, Response, HTTPException, status, Depends, 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-    if method == "GET" and clean.endswith("/vnpay/return"):
-        return True
-    if method == "GET" and clean.endswith("/vnpay/return"):
-        return True
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
@@ -138,6 +134,8 @@ def is_public_path(method: str, target_path: str, clean_path: str) -> bool:
         return True
 
     if method == "POST" and (target_path == "/users/login" or clean.endswith("/login") or clean == "login"):
+        return True
+    if method == "GET" and clean.endswith("/vnpay/return"):
         return True
 
     return False

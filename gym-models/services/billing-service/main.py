@@ -1,9 +1,15 @@
 import sys
 import os
+import hashlib
+import hmac
 import threading
+import time
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
-from fastapi import FastAPI, HTTPException, Depends
+from urllib.parse import urlencode
+from fastapi import FastAPI, HTTPException, Depends, Request
 from starlette import status
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,7 +20,7 @@ if current_dir not in sys.path:
 
 import models
 from models import Invoice, Payment
-from schemas import Invoice_Request, Payment_Request
+from schemas import Invoice_Request, Payment_Request, Vnpay_Create_Request
 from database import engine, SessionLocal, get_db
 from config import settings
 
@@ -29,6 +35,11 @@ app.add_middleware(
 )
 
 models.Base.metadata.create_all(bind=engine)
+
+with engine.begin() as conn:
+    payment_columns = [row[1] for row in conn.execute(text("PRAGMA table_info(payments)")).fetchall()]
+    if "transaction_ref" not in payment_columns:
+        conn.execute(text("ALTER TABLE payments ADD COLUMN transaction_ref VARCHAR"))
 
 db_dependency = Annotated[Session, Depends(get_db)]
 
@@ -64,6 +75,27 @@ def _recalculate_invoice_in_tx(db: Session, invoice_id: int):
         else:
             invoice.status = "pending"
     db.add(invoice)
+
+
+def _vnpay_query_string(params: dict[str, str]) -> str:
+    return urlencode(sorted(params.items()))
+
+
+def _vnpay_signature(params: dict[str, str]) -> str:
+    query_string = _vnpay_query_string(params)
+    return hmac.new(
+        settings.VNPAY_HASH_SECRET.encode("utf-8"),
+        query_string.encode("utf-8"),
+        hashlib.sha512,
+    ).hexdigest()
+
+
+def _validate_vnpay_settings() -> None:
+    if not settings.VNPAY_TMN_CODE or not settings.VNPAY_HASH_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="VNPay Sandbox chưa được cấu hình",
+        )
 
 
 @app.on_event("startup")
@@ -158,6 +190,93 @@ def delete_invoice(db: db_dependency, id: int):
 @app.get("/payments")
 async def get_all_payments(db: db_dependency):
     return db.query(Payment).all()
+
+
+@app.post("/payments/vnpay/create")
+def create_vnpay_payment(
+    request: Request,
+    db: db_dependency,
+    payment_request: Vnpay_Create_Request,
+):
+    _validate_vnpay_settings()
+    invoice = db.query(Invoice).filter(Invoice.id == payment_request.invoice_id).first()
+    if invoice is None:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    if invoice.status in ("cancelled", "paid"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invoice is not payable",
+        )
+
+    remaining_amount = round(float(invoice.amount or 0) - float(invoice.amount_paid or 0), 2)
+    if remaining_amount <= 0:
+        raise HTTPException(status_code=400, detail="Invoice has no remaining balance")
+
+    transaction_ref = f"{invoice.id}_{int(time.time())}"
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    now = datetime.now(timezone.utc) + timedelta(hours=7)
+    params = {
+        "vnp_Version": "2.1.0",
+        "vnp_Command": "pay",
+        "vnp_TmnCode": settings.VNPAY_TMN_CODE,
+        "vnp_Amount": str(int(round(remaining_amount * 100))),
+        "vnp_CurrCode": "VND",
+        "vnp_TxnRef": transaction_ref,
+        "vnp_OrderInfo": f"Thanh toan hoa don {invoice.id}",
+        "vnp_OrderType": settings.VNPAY_ORDER_TYPE,
+        "vnp_Locale": "vn",
+        "vnp_ReturnUrl": settings.VNPAY_RETURN_URL,
+        "vnp_IpAddr": client_ip,
+        "vnp_CreateDate": now.strftime("%Y%m%d%H%M%S"),
+        "vnp_ExpireDate": (now + timedelta(minutes=15)).strftime("%Y%m%d%H%M%S"),
+    }
+    params["vnp_SecureHash"] = _vnpay_signature(params)
+    return {"payment_url": f"{settings.VNPAY_URL}?{urlencode(params)}", "transaction_ref": transaction_ref}
+
+
+@app.get("/payments/vnpay/return")
+def vnpay_return(request: Request, db: db_dependency):
+    raw_params = {key: value for key, value in request.query_params.items() if key.startswith("vnp_")}
+    received_signature = raw_params.pop("vnp_SecureHash", "")
+    raw_params.pop("vnp_SecureHashType", None)
+    if not received_signature or not hmac.compare_digest(received_signature, _vnpay_signature(raw_params)):
+        raise HTTPException(status_code=400, detail="Invalid VNPay signature")
+
+    transaction_ref = raw_params.get("vnp_TxnRef", "")
+    response_code = raw_params.get("vnp_ResponseCode")
+    transaction_status = raw_params.get("vnp_TransactionStatus")
+    try:
+        invoice_id = int(transaction_ref.split("_", 1)[0])
+        paid_amount = int(raw_params.get("vnp_Amount", "0")) / 100
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid VNPay transaction")
+
+    if response_code != "00" or transaction_status not in (None, "00"):
+        return {"success": False, "message": "VNPay payment was not completed", "response_code": response_code}
+
+    with billing_lock:
+        invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+        if invoice is None:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+        expected_amount = round(float(invoice.amount or 0) - float(invoice.amount_paid or 0), 2)
+        if round(paid_amount, 2) != expected_amount:
+            raise HTTPException(status_code=400, detail="VNPay amount does not match invoice balance")
+
+        payment = db.query(Payment).filter(Payment.transaction_ref == transaction_ref).first()
+        if payment is None:
+            payment = Payment(
+                invoice_id=invoice.id,
+                amount=paid_amount,
+                payment_method="vnpay",
+                transaction_ref=transaction_ref,
+                notes="VNPay Sandbox",
+            )
+            db.add(payment)
+            db.flush()
+            _recalculate_invoice_in_tx(db, invoice.id)
+            _commit_with_rollback(db)
+
+    return {"success": True, "message": "VNPay payment recorded", "invoice_id": invoice.id}
 
 
 @app.get("/payments/{id}")

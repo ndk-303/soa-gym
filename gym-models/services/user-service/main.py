@@ -136,7 +136,6 @@ async def login(login_req: Login_Request, db: db_dependency):
         }
     }
 
-
 @app.get("/users/{id}")
 async def get_user(db: db_dependency, id: int):
     user = db.query(User).filter(User.id == id).first()

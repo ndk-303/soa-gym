@@ -1,6 +1,5 @@
 from sqlalchemy import Column, Integer, String, Float
 from database import Base
-    transaction_ref = Column(String, nullable=True, index=True)
 
 
 class Invoice(Base):
@@ -18,4 +17,5 @@ class Payment(Base):
     invoice_id = Column(Integer)
     amount = Column(Float)
     payment_method = Column(String, default="cash")
+    transaction_ref = Column(String, nullable=True, index=True)
     notes = Column(String, default="")

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { paymentsApi, invoicesApi, membersApi } from '../services/api'
+import { paymentsApi, invoicesApi, membersApi, vnpayApi } from '../services/api'
 import { ActionMenu, ManagementHeader, ManagementTable, ManagementFilterBar, ManagementModal } from '../components/ManagementUI'
 import { formatVnd } from '../components/managementUtils'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -109,6 +109,12 @@ export default function PaymentsPage() {
     }
 
     try {
+      if (!editingId && formData.payment_method === 'vnpay') {
+        const response = await vnpayApi.createPaymentUrl(Number(formData.invoice_id))
+        window.location.assign(response.data.payment_url)
+        return
+      }
+
       const payload = {
         invoice_id: Number(formData.invoice_id),
         amount: Number(formData.amount),
@@ -159,6 +165,7 @@ export default function PaymentsPage() {
     { value: 'cash', label: 'Tiền mặt' },
     { value: 'bank_transfer', label: 'Chuyển khoản ngân hàng' },
     { value: 'vietqr', label: 'VietQR' },
+    { value: 'vnpay', label: 'VNPay Sandbox' },
     { value: 'credit_card', label: 'Thẻ tín dụng' },
   ]
 
@@ -252,7 +259,7 @@ export default function PaymentsPage() {
               </td>
               <td className="money">{formatVnd(p.amount)}</td>
               <td>
-                <span className="semantic-badge">{({ cash: 'Tiền mặt', bank_transfer: 'Chuyển khoản', vietqr: 'VietQR', credit_card: 'Thẻ tín dụng' })[p.payment_method] || p.payment_method}</span>
+                <span className="semantic-badge">{({ cash: 'Tiền mặt', bank_transfer: 'Chuyển khoản', vietqr: 'VietQR', credit_card: 'Thẻ tín dụng', vnpay: 'VNPay' })[p.payment_method] || p.payment_method}</span>
               </td>
               <td className="table-note">{p.notes || '—'}</td>
               <td className="text-center actions-cell">
@@ -321,7 +328,7 @@ export default function PaymentsPage() {
               >
                 <option value="cash">Tiền mặt</option>
                 <option value="bank_transfer">Chuyển khoản ngân hàng</option>
-                <option value="vietqr">VietQR</option>
+                <option value="vnpay">VNPay Sandbox</option>
                 <option value="credit_card">Thẻ tín dụng</option>
               </select>
             </div>
